@@ -41,27 +41,44 @@ def _numbers_of(mv: MetricValue) -> set:
     return {_normalize(n) for n in _numbers_in(mv.value)}
 
 
-def _material_overlap(a: str, b: str) -> int:
+def _token_overlap(a: str, b: str) -> int:
     """Crude but effective: count shared alphanumeric tokens between two
-    material/condition labels, case-insensitive. Used only to find the
-    BEST candidate match in the secondary list, not as a correctness
-    check by itself."""
+    labels, case-insensitive."""
     ta = set(_normalize(a).replace("-", " ").split())
     tb = set(_normalize(b).replace("-", " ").split())
     return len(ta & tb)
 
 
+# Fix #4: material and condition overlap used to be folded into one bag of
+# tokens (`f"{material} {condition}"`), so a candidate could win purely on
+# condition-word overlap with the WRONG material, or vice versa -- there
+# was no way to tell "same material, different condition" apart from
+# "same condition, different material" once they were merged into a
+# single score. Scoring them separately lets _best_match() rank on
+# material first (the stronger identity signal) and lets compare() below
+# check condition agreement on its own before confirming a match.
+def _material_overlap(a: str, b: str) -> int:
+    return _token_overlap(a, b)
+
+
+def _condition_overlap(a: str, b: str) -> int:
+    return _token_overlap(a, b)
+
+
 def _best_match(primary_mv: MetricValue, secondary_values: List[MetricValue]) -> Optional[MetricValue]:
     if not secondary_values:
         return None
-    label = f"{primary_mv.material} {primary_mv.condition}"
     scored = [
-        (_material_overlap(label, f"{mv.material} {mv.condition}"), mv)
+        (
+            _material_overlap(primary_mv.material, mv.material),
+            _condition_overlap(primary_mv.condition, mv.condition),
+            mv,
+        )
         for mv in secondary_values
     ]
-    scored.sort(key=lambda t: t[0], reverse=True)
-    best_score, best_mv = scored[0]
-    return best_mv if best_score > 0 else (secondary_values[0] if len(secondary_values) == 1 else None)
+    scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
+    best_material, best_condition, best_mv = scored[0]
+    return best_mv if best_material > 0 else (secondary_values[0] if len(secondary_values) == 1 else None)
 
 
 class CrossChecker:
@@ -104,13 +121,27 @@ class CrossChecker:
                 match = _best_match(mv, secondary_values)
                 match_numbers = _numbers_of(match) if match else set()
 
-                if primary_numbers & match_numbers:
+                condition_mismatch = (
+                    match is not None
+                    and mv.condition
+                    and match.condition
+                    and _condition_overlap(mv.condition, match.condition) == 0
+                )
+
+                if primary_numbers & match_numbers and not condition_mismatch:
                     # Independent pass found the same number for the
                     # closest-matching material/condition -- treat as
                     # confirmed even though it wasn't in raw text (it's
                     # very likely a correctly-read chart value).
                     mv.confidence = "confirmed"
                 else:
+                    # Either no matching number, or the numbers happened
+                    # to agree but the matched entry's condition shares
+                    # zero tokens with primary's -- e.g. two different
+                    # test conditions compared across materials (see
+                    # Fig. 9-style wear-scar mixups). A coincidental
+                    # number match under a clearly different condition is
+                    # not a genuine independent confirmation.
                     mv.confidence = "crosscheck_mismatch"
                     flagged += 1
 
