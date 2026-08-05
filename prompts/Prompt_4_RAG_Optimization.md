@@ -203,6 +203,22 @@ Applications
 
 ------------------------------------------------------------
 
+6a.
+
+The engineering-concept headings above (e.g. "Boundary Lubrication", "Design
+Recommendations", "Industrial Implications") are groupings YOU generate for
+retrieval. They are NOT the paper's own literal section titles, even when
+the wording looks similar.
+
+Never phrase output as "as stated in the paper's [X] section" (or
+equivalent) unless [X] is a heading that appears verbatim in the paper's
+own text. If you need to describe where information came from, use the
+`source_sections` field (see OUTPUT 2) or phrase it generically -- e.g.
+"the paper reports..." -- instead of attributing it to an invented section
+name.
+
+------------------------------------------------------------
+
 7.
 
 Each chunk should be independently understandable.
@@ -272,6 +288,13 @@ Each chunk should contain:
 "source_sections": [],
 "related_chunks": []
 }
+
+`source_sections` must contain ONLY section names or numbers that
+literally appear in the paper (e.g. "3.2", "Results and Discussion",
+"Table 4"). Do NOT put invented topic/engineering-concept headings in
+here -- not the chunk's own `title`, not any of the Rule 6 groupings, and
+not paraphrased section descriptions. If the paper's literal section for
+this content cannot be identified, use an empty array `[]`.
 
 ------------------------------------------------------------
 
