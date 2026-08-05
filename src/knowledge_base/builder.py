@@ -52,6 +52,19 @@ class KnowledgeBaseBuilder:
         return f"{label}: {value_str}{hedge}" if label else f"{value_str}{hedge}"
 
     @staticmethod
+    def _mechanism_to_str(entry) -> str:
+        """One wear_mechanisms/failure_modes entry -> a single readable
+        line. Stays tolerant of the old flat-string shape too, for any
+        JSON files still lying around from a pre-restructure pipeline
+        run. Never renders the paraphrase in quotes -- that distinction
+        belongs to the RAG/Markdown prompt, not this local rebuild step."""
+        if isinstance(entry, str):
+            return entry
+        if not isinstance(entry, dict):
+            return str(entry)
+        return entry.get("text", "")
+
+    @staticmethod
     def _material_label(entry) -> str:
         """One MaterialEntry -> a readable label with a PFAS/fluoropolymer
         flag when applicable. Stays tolerant of the old flat-string shape
@@ -129,7 +142,11 @@ class KnowledgeBaseBuilder:
         entries = []
         for stem, d in papers:
             r = d.get("results", {})
-            items = r.get("wear_mechanisms", []) + r.get("failure_modes", []) + r.get("friction_results", [])
+            items = (
+                [self._mechanism_to_str(m) for m in r.get("wear_mechanisms", [])]
+                + [self._mechanism_to_str(m) for m in r.get("failure_modes", [])]
+                + r.get("friction_results", [])
+            )
             entries.append((self._title(d, stem), items))
         self._write_section(entries, self.kb_dir / "wear_mechanisms.md", "Wear Mechanisms & Failure Modes")
 

@@ -101,11 +101,28 @@ When you write this into prose (Markdown or chunk content), you MUST:
       - "unverified" -> add "(unverified -- not confirmed in source text)".
       - "crosscheck_mismatch" -> add
         "(unconfirmed -- independent extraction disagreed)".
+      - "contradicts_table" -> present BOTH conflicting records explicitly,
+        do not pick one -- e.g. "(discrepancy: prose states 49.5%; Table 6
+        implies 33.1% -- not resolved)". Never silently render only one of
+        the two numbers.
       - "not_reported" -> write "Not Reported", do not omit the record
         silently; the absence of data is itself useful information.
   - Never merge multiple materials' values into one summarized range or
     "most materials" statement -- write one clear sentence/bullet per
     record so a reader can find their specific material's number.
+
+3b.
+
+Every entry under `results.wear_mechanisms` and `results.failure_modes` in
+the input JSON is a structured record with `text` and `provenance`
+("verbatim" | "paraphrase").
+
+Only render `text` inside quotation marks if `provenance` is "verbatim".
+If `provenance` is "paraphrase", write it as plain unquoted prose --
+never present a pipeline paraphrase as if it were a direct quote from the
+paper.
+
+------------------------------------------------------------
 
 °C
 
@@ -203,6 +220,22 @@ Applications
 
 ------------------------------------------------------------
 
+6a.
+
+The engineering-concept headings above (e.g. "Boundary Lubrication", "Design
+Recommendations", "Industrial Implications") are groupings YOU generate for
+retrieval. They are NOT the paper's own literal section titles, even when
+the wording looks similar.
+
+Never phrase output as "as stated in the paper's [X] section" (or
+equivalent) unless [X] is a heading that appears verbatim in the paper's
+own text. If you need to describe where information came from, use the
+`source_sections` field (see OUTPUT 2) or phrase it generically -- e.g.
+"the paper reports..." -- instead of attributing it to an invented section
+name.
+
+------------------------------------------------------------
+
 7.
 
 Each chunk should be independently understandable.
@@ -272,6 +305,13 @@ Each chunk should contain:
 "source_sections": [],
 "related_chunks": []
 }
+
+`source_sections` must contain ONLY section names or numbers that
+literally appear in the paper (e.g. "3.2", "Results and Discussion",
+"Table 4"). Do NOT put invented topic/engineering-concept headings in
+here -- not the chunk's own `title`, not any of the Rule 6 groupings, and
+not paraphrased section descriptions. If the paper's literal section for
+this content cannot be identified, use an empty array `[]`.
 
 ------------------------------------------------------------
 

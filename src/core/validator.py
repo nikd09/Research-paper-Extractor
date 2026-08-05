@@ -77,6 +77,47 @@ def _numbers_in(text: str) -> List[str]:
     return [m.group(0) for m in _NUMBER_RE.finditer(normalized_text)]
 
 
+# Fix #4: proximity-based attribution check. _is_grounded() above only
+# proves a number exists SOMEWHERE in the source text -- it never checked
+# which material/condition it actually belongs to there, so a value with
+# the right material but the WRONG test condition (numerically real,
+# just mispaired -- e.g. a Fig. 9 wear-scar comparison mixing two test
+# conditions between materials) passed as "confirmed" with no way to
+# catch it. _is_attributed_nearby() adds a second, tolerant check: at
+# least one occurrence of the number must have material/condition
+# context tokens somewhere within a window around it. Deliberately
+# tolerant (any shared token, generous window) -- this is meant to catch
+# a number paired with clearly unrelated context, not to demand exact
+# attribution, since reflowed PDF text often separates a table's row
+# label from its numbers by more than a few words.
+#
+# KNOWN LIMITATION (tested against real paper text, not just synthetic
+# cases): this is a text-proximity heuristic over linearized/reflowed
+# text, not real table structure -- it reliably catches a value attributed
+# to a clearly unrelated/distant material or condition, but will NOT
+# reliably catch a value mismatched to the WRONG sibling row within a
+# tightly-packed table when multiple materials in that table share a
+# common name substring (e.g. "Pure PTFE" vs "PEEK/PTFE" vs
+# "Nano-ZrO2/PTFE" all sharing "PTFE" within a ~100-char table). Properly
+# solving that would need real row/column structure (the pipeline's
+# STRUCTURED TABLES pre-extraction has this; validator.py currently does
+# not receive it) rather than a proximity guess over flat text. Ship as a
+# real improvement over zero attribution-checking, not a complete fix for
+# every table layout.
+_ATTRIBUTION_WINDOW_CHARS = 400
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+def _tokens(s: str) -> set:
+    """Lowercase alphanumeric tokens, unicode-minus-folded but NOT
+    whitespace-collapsed -- unlike _normalize(), which exists purely for
+    substring matching and deliberately destroys word boundaries."""
+    s = s.lower()
+    for ch in _UNICODE_MINUS_CHARS:
+        s = s.replace(ch, "-")
+    return set(_WORD_RE.findall(s))
+
+
 class NumericValidator:
 
     @staticmethod
@@ -87,6 +128,46 @@ class NumericValidator:
         return all(_normalize(n) in norm_source for n in numbers)
 
     @staticmethod
+    def _is_attributed_nearby(value: str, material: str, condition: str, source_text: str) -> bool:
+        """Among the raw occurrences of `value`'s number(s) in source_text,
+        is at least one of them near material/condition context tokens?
+        Only meaningful once _is_grounded() has already passed -- this
+        judges WHICH occurrence the value likely came from, not whether
+        it exists at all."""
+        numbers = _numbers_in(value)
+        if not numbers:
+            return True
+
+        context_tokens = _tokens(material) | _tokens(condition)
+        if not context_tokens:
+            # Nothing to check attribution against (e.g. a property with
+            # no stated condition) -- don't penalize for that.
+            return True
+
+        lower_source = source_text.lower()
+        for ch in _UNICODE_MINUS_CHARS:
+            lower_source = lower_source.replace(ch, "-")
+
+        found_any_occurrence = False
+        target_norms = {_normalize(n) for n in numbers}
+        for m in _NUMBER_RE.finditer(lower_source):
+            if _normalize(m.group(0)) not in target_norms:
+                continue
+            found_any_occurrence = True
+            start = max(0, m.start() - _ATTRIBUTION_WINDOW_CHARS)
+            end = min(len(lower_source), m.end() + _ATTRIBUTION_WINDOW_CHARS)
+            window_tokens = _tokens(lower_source[start:end])
+            if context_tokens & window_tokens:
+                return True
+
+        if not found_any_occurrence:
+            # _is_grounded() already covers "not found at all" -- treat
+            # this as pass-through rather than double-penalizing.
+            return True
+
+        return False
+
+    @staticmethod
     def check_field(values: List[MetricValue], source_text: str) -> Tuple[int, int]:
         """Sets .confidence on each MetricValue in place. Returns
         (grounded_count, ungrounded_count)."""
@@ -94,14 +175,17 @@ class NumericValidator:
         grounded_n, ungrounded_n = 0, 0
 
         for mv in values:
-            if mv.confidence in ("approximate", "not_reported"):
+            if mv.confidence in ("approximate", "not_reported", "contradicts_table"):
                 # Already explicitly handled by the extraction/verify step
                 # (e.g. a chart read with no exact gridline, or genuinely
-                # unrecoverable) -- don't downgrade or override those.
+                # unrecoverable, or a flagged prose/table discrepancy) --
+                # don't downgrade or override those.
                 grounded_n += 1
                 continue
 
-            if NumericValidator._is_grounded(mv.value, norm_source):
+            if NumericValidator._is_grounded(mv.value, norm_source) and NumericValidator._is_attributed_nearby(
+                mv.value, mv.material, mv.condition, source_text
+            ):
                 mv.confidence = "confirmed"
                 grounded_n += 1
             else:
