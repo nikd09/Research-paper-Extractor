@@ -111,6 +111,19 @@ When you write this into prose (Markdown or chunk content), you MUST:
     "most materials" statement -- write one clear sentence/bullet per
     record so a reader can find their specific material's number.
 
+3b.
+
+Every entry under `results.wear_mechanisms` and `results.failure_modes` in
+the input JSON is a structured record with `text` and `provenance`
+("verbatim" | "paraphrase").
+
+Only render `text` inside quotation marks if `provenance` is "verbatim".
+If `provenance` is "paraphrase", write it as plain unquoted prose --
+never present a pipeline paraphrase as if it were a direct quote from the
+paper.
+
+------------------------------------------------------------
+
 °C
 
 rpm

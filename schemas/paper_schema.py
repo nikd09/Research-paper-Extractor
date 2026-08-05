@@ -108,10 +108,21 @@ class Experiment(BaseModel):
 
 # ---------- RESULTS ----------
 
+# wear_mechanisms/failure_modes are pipeline narrative -- almost always a
+# paraphrase of the paper's own explanation, not a copy-paste of its
+# sentences. Downstream consumers (RAG/Markdown output, Copilot agents
+# reading it) have no way to tell the difference from a plain string, so a
+# paraphrase has been surfaced in quotation marks as if directly quoting
+# the paper. `provenance` makes that distinction explicit per statement.
+class MechanismNote(BaseModel):
+    text: str = ""
+    provenance: str = "paraphrase"   # "verbatim" | "paraphrase"
+
+
 class Results(BaseModel):
     key_findings: List[str] = Field(default_factory=list)
-    wear_mechanisms: List[str] = Field(default_factory=list)
-    failure_modes: List[str] = Field(default_factory=list)
+    wear_mechanisms: List[MechanismNote] = Field(default_factory=list)
+    failure_modes: List[MechanismNote] = Field(default_factory=list)
     friction_results: List[str] = Field(default_factory=list)
 
 
