@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Engineering Knowledge Extraction Pipeline</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="app">
+
+    <!-- Header -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <h1>Engineering Knowledge Extraction Pipeline</h1>
+          <p class="subtitle">Bearing R&amp;D literature &rarr; structured JSON / Markdown / RAG chunks</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" title="Toggle light/dark theme">
+          <span class="theme-icon" id="themeIcon">&#9789;</span>
+        </button>
+        <div class="status-pill" id="statusPill">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Idle</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Single screen -->
+    <div class="layout">
+
+      <!-- Left: configuration -->
+      <section class="panel config-panel">
+
+        <div class="field">
+          <label>Input Folder</label>
+          <div class="path-row">
+            <input type="text" id="inputDir" readonly />
+            <button class="btn btn-ghost" id="browseInput">Browse</button>
+          </div>
+          <div class="path-row" style="margin-top:6px">
+            <button class="btn btn-ghost btn-full" id="addPapersBtn">+ Add PDFs</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Output Folder</label>
+          <div class="path-row">
+            <input type="text" id="outputDir" readonly />
+            <button class="btn btn-ghost" id="browseOutput">Browse</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Prompt Model <span class="info-badge" title="Only affects per-paper extraction. Verify/crosscheck/escalation use their own fixed cascade.">i</span></label>
+          <select id="modelSelect"></select>
+          <div class="model-note" id="modelNote"></div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-value" id="statFound">--</span>
+            <span class="stat-label">PDFs Found</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="statProcessed">--</span>
+            <span class="stat-label">Already Processed</span>
+          </div>
+          <div class="stat stat-accent">
+            <span class="stat-value" id="statRemaining">--</span>
+            <span class="stat-label">Remaining</span>
+          </div>
+        </div>
+
+        <button class="btn btn-ghost btn-full" id="rescanBtn">Rescan Folders</button>
+
+        <div class="actions">
+          <button class="btn btn-start" id="startBtn">&#9654;&nbsp; Start Pipeline</button>
+          <button class="btn btn-stop" id="cancelBtn" disabled>&#9632;&nbsp; Cancel</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+          <label>Knowledge Base <span class="info-badge" title="Cross-paper reasoning over everything already processed -- ranks materials, flags contradictions and gaps for your target application.">i</span></label>
+          <select id="synthModelSelect"></select>
+        </div>
+
+        <details class="advanced-toggle">
+          <summary>Advanced: customize operating envelope</summary>
+          <textarea id="envelopeInput" rows="6"></textarea>
+        </details>
+
+        <button class="btn btn-primary btn-full" id="runSynthBtn">Build Knowledge Base</button>
+        <div class="kb-note" id="synthNote"></div>
+        <button class="btn btn-ghost btn-full" id="openBriefBtn" style="display:none">Open Knowledge Base File</button>
+
+      </section>
+
+      <!-- Right: single shared progress + console -->
+      <section class="panel progress-panel">
+
+        <div class="progress-head">
+          <div>
+            <span class="paper-label" id="paperLabel">No paper in progress</span>
+            <span class="paper-count" id="paperCount"></span>
+          </div>
+          <span class="eta" id="etaLabel"></span>
+        </div>
+
+        <div class="progress-bar-track"></div>
+
+        <div class="step-label" id="stepLabel">Waiting to start&hellip;</div>
+
+        <div class="console" id="console"></div>
+
+      </section>
+
+    </div>
+
+    <footer class="footer">
+      <span>Saint-Gobain Performance Plastics &middot; Willich R&amp;D &middot; Thesis Tooling</span>
+    </footer>
+
+  </div>
+
+<script src="app.js"></script>
+</body>
+</html>

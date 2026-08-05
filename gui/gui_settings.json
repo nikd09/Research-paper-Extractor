@@ -1,0 +1,7 @@
+{
+  "input_dir": "C:\\Users\\N7215177\\Downloads\\Python Tool 4\\papers\\input",
+  "output_dir": "C:\\Users\\N7215177\\Downloads\\Python Tool 4\\outputs",
+  "model": "models/gemini-3.6-flash",
+  "synthesis_model": "flash",
+  "envelope": "Automotive seat recliner pivot/bushing mechanism: low sliding speed (oscillatory, not continuous rotation), boundary-lubricated or dry sliding, light-to-moderate contact pressure, indoor cabin temperature range (roughly -20C to 80C), multi-year maintenance-free service life, priority on low friction (avoid squeak/stick-slip), low wear, and no grease contamination of upholstery. Static friction / stiction (stick-slip onset) matters as much as steady-state dynamic friction, since that transition is the primary driver of audible squeak."
+}
