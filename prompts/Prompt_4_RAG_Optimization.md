@@ -101,6 +101,10 @@ When you write this into prose (Markdown or chunk content), you MUST:
       - "unverified" -> add "(unverified -- not confirmed in source text)".
       - "crosscheck_mismatch" -> add
         "(unconfirmed -- independent extraction disagreed)".
+      - "contradicts_table" -> present BOTH conflicting records explicitly,
+        do not pick one -- e.g. "(discrepancy: prose states 49.5%; Table 6
+        implies 33.1% -- not resolved)". Never silently render only one of
+        the two numbers.
       - "not_reported" -> write "Not Reported", do not omit the record
         silently; the absence of data is itself useful information.
   - Never merge multiple materials' values into one summarized range or

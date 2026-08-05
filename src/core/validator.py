@@ -94,10 +94,11 @@ class NumericValidator:
         grounded_n, ungrounded_n = 0, 0
 
         for mv in values:
-            if mv.confidence in ("approximate", "not_reported"):
+            if mv.confidence in ("approximate", "not_reported", "contradicts_table"):
                 # Already explicitly handled by the extraction/verify step
                 # (e.g. a chart read with no exact gridline, or genuinely
-                # unrecoverable) -- don't downgrade or override those.
+                # unrecoverable, or a flagged prose/table discrepancy) --
+                # don't downgrade or override those.
                 grounded_n += 1
                 continue
 

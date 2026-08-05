@@ -164,6 +164,10 @@ class MetricValue(BaseModel):
     #   crosscheck_mismatch - an independent second extraction found a
     #                        different value for this same material/
     #                        condition and neither could be confirmed
+    #   contradicts_table   - a prose-stated value and a table/figure-stated
+    #                        value for the same material/condition disagree;
+    #                        both records are kept (one per source) rather
+    #                        than one being silently dropped or preferred
     #   not_reported        - genuinely not recoverable; value should read
     #                        "Not Reported"
     confidence: str = "unverified"

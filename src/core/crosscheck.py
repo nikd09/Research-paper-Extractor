@@ -87,11 +87,14 @@ class CrossChecker:
             secondary_values: List[MetricValue] = getattr(secondary, field, None) if secondary else []
 
             for mv in primary_values:
-                if mv.confidence in ("approximate", "not_reported", "confirmed"):
+                if mv.confidence in ("approximate", "not_reported", "confirmed", "contradicts_table"):
                     # "confirmed" already passed the deterministic text-
                     # grounding check in validator.py -- that's a stronger
                     # signal than an independent Flash-Lite re-extraction,
-                    # so don't let crosscheck downgrade it.
+                    # so don't let crosscheck downgrade it. "contradicts_table"
+                    # is an already-flagged prose/table discrepancy -- don't
+                    # let a second independent extraction paper over it by
+                    # confirming one side.
                     continue
 
                 primary_numbers = _numbers_of(mv)
