@@ -55,7 +55,7 @@ EXTRACT_MODELS = [
 MANUAL_PRO_VERIFY = False
 
 VERIFY_CASCADE = [
-    {"models": ["models/gemini-3.5-flash", "models/gemini-3.6-flash"], "keys": FREE_API_KEYS},
+    {"models": ["models/gemini-3.6-flash", "models/gemini-3.5-flash"], "keys": FREE_API_KEYS},
     {"models": ["models/gemini-3.6-flash", "models/gemini-3.5-flash"], "keys": [PAID_API_KEY] if PAID_API_KEY else []},
 ]
 
@@ -72,12 +72,13 @@ if MANUAL_PRO_VERIFY:
     )
 
 RAG_MODELS = [
-    "models/gemini-3.5-flash",
     "models/gemini-3.6-flash",
+    "models/gemini-3.5-flash",
 ]
 
 CROSSCHECK_MODELS = [
     "models/gemini-3.5-flash-lite",
+    "models/gemini-3.6-flash",
 ]
 
 # ==========================
