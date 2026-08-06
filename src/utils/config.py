@@ -116,6 +116,15 @@ PREFERRED_MODELS = EXTRACT_MODELS
 MAX_RETRIES = 3
 REQUEST_TIMEOUT = 120
 
+# Base delay (seconds) between same-model retry attempts, doubled each
+# attempt (2s, 4s, 8s, ...). Without this, a sustained failure (a model
+# genuinely at capacity, not a one-off blip) burns through every
+# attempt/model/key combination back-to-back in seconds -- each one still
+# counts against RPD even though it failed, so a no-backoff retry storm
+# wastes daily quota fast instead of giving the underlying condition a
+# chance to clear.
+RETRY_BACKOFF_BASE_SECONDS = 2
+
 # Enable/disable optional fixes without touching pipeline code
 ENABLE_NUMERIC_VALIDATION = True   # Fix #1
 ENABLE_MULTIMODAL_VERIFY = True    # Fix #2 (now figure-targeted, not whole-PDF)
