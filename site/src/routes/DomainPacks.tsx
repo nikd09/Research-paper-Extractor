@@ -221,8 +221,8 @@ export function DomainPacks() {
         <Eyebrow className="mb-4">Honest summary</Eyebrow>
         <Prose>
           <p>
-            Retargeting Assay today means editing five files and keeping three copies of a list in
-            sync. Retargeting it after the pack refactor means writing one <code>pack.yaml</code> and
+            Retargeting The Multi-Tier Verification &amp; Extraction Pipeline today means editing
+            five files and keeping three copies of a list in sync. Retargeting it after the pack refactor means writing one <code>pack.yaml</code> and
             dropping in prompts and requirements documents. The distance between those two sentences
             is the honest state of the generalisation claim, and I’d rather this tab said so than
             have someone discover it by trying.

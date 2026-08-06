@@ -92,7 +92,8 @@ export function Status() {
               application, or that the material is a good idea.
             </p>
             <p>
-              Assay narrows down which numbers a person has to check. It doesn’t replace the person.
+              The Multi-Tier Verification &amp; Extraction Pipeline narrows down which numbers a
+              person has to check. It doesn’t replace the person.
             </p>
           </Prose>
           <Panel className="self-start p-5 md:p-6">
