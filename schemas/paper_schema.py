@@ -67,6 +67,14 @@ class EngineeringKnowledge(BaseModel):
     engineering_disciplines: List[str] = Field(default_factory=list)
     engineering_topics: List[str] = Field(default_factory=list)
     keywords: List[str] = Field(default_factory=list)
+    # Flat, ungrounded List[str] -- same shape MetricValue had before its
+    # material/condition/confidence restructure, and the same shape
+    # RelevanceNote replaced with an explicit stated_in_paper flag. No way
+    # to tell here whether an application was stated by the paper or
+    # inferred by the pipeline, so nothing downstream can hedge it
+    # correctly. Should eventually get the same stated_in_paper treatment
+    # as RelevanceNote. Lower priority than the RelevanceNote hedge-
+    # propagation fix in Prompt_4 -- not changing this now.
     applications: List[str] = Field(default_factory=list)
 
 
