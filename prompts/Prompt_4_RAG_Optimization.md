@@ -111,6 +111,16 @@ When you write this into prose (Markdown or chunk content), you MUST:
     "most materials" statement -- write one clear sentence/bullet per
     record so a reader can find their specific material's number.
 
+  This entire rule -- the attribution requirement AND the confidence-hedge
+  requirement -- applies IDENTICALLY to chunk `content`/`summary` fields,
+  not just the Markdown document. Do not treat the Chunks output as a
+  "cleaner" or "simplified" version that can drop a hedge the Markdown
+  keeps. A value with confidence "approximate", "unverified",
+  "crosscheck_mismatch", or "contradicts_table" must carry its qualifier
+  in BOTH outputs, worded identically in substance. If you find yourself
+  writing a chunk sentence that restates a Markdown value without its
+  hedge, that is a bug -- go back and add it.
+
 3b.
 
 Every entry under `results.wear_mechanisms` and `results.failure_modes` in
@@ -121,6 +131,37 @@ Only render `text` inside quotation marks if `provenance` is "verbatim".
 If `provenance` is "paraphrase", write it as plain unquoted prose --
 never present a pipeline paraphrase as if it were a direct quote from the
 paper.
+
+3c.
+
+Every `RelevanceNote` field (`relevance.automotive_relevance`,
+`relevance.seat_recliner_relevance`) is a structured record with
+`stated_in_paper` (boolean) and `note` (string). When you write this into
+prose (Markdown OR chunk content -- see rule 3a, same requirement applies
+identically to both outputs here too), you MUST:
+
+  - If `stated_in_paper` is true: state it plainly and you may attribute
+    it to the paper (e.g. "the paper reports...").
+  - If `stated_in_paper` is false: the claim MUST carry an inline
+    qualifier directly attached to it, in the same sentence/bullet -- e.g.
+    "(not explicitly discussed in the paper -- inferred from measured
+    properties)". Never phrase it as a bare, unqualified fact.
+  - Never use a heading or label that implies the paper stated this when
+    it did not -- e.g. do NOT write "Applications Explicitly Identified"
+    as a heading over an inferred relevance. Use wording that itself
+    signals inference, e.g. "Possible / Inferred Applications", or keep
+    the inline qualifier immediately visible next to the claim so no
+    heading can misrepresent it.
+  - If `note` is "Not Reported", omit that relevance from the output
+    entirely rather than inventing a heading or sentence for it.
+
+Confirmed real failure mode: an inferred relevance (`stated_in_paper:
+false`, properly hedged in the JSON's `note`) was rendered in both the
+Markdown's "Target Industrial Applications" section and its matching
+chunk as a bare fact under an "Applications Explicitly Identified"
+label -- the hedge existed in the JSON but never reached either output.
+Since chunks carry a citation stamp, that is a confidently wrong,
+falsely-cited answer to anyone querying it. This must never happen again.
 
 ------------------------------------------------------------
 
