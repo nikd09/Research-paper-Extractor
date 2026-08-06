@@ -102,7 +102,10 @@ SYNTHESIS_MODEL_OPTIONS = {
 STAGE_CONFIG = {
     "extract":         {"models": EXTRACT_MODELS,     "keys": FREE_API_KEYS, "paid_fallback": True},
     "verify":          {"cascade": VERIFY_CASCADE, "warn_on_model_fallback": False},
-    "verify_escalate": {"models": [ESCALATION_MODEL], "keys": [], "paid_fallback": True, "force_paid": True},
+    # thinking_level="medium" only applies here -- ESCALATION_MODEL is the
+    # sole model in this stage's list (gemini-3.1-pro-preview), so this can
+    # never reach a Flash-tier call. See GeminiClient._generate().
+    "verify_escalate": {"models": [ESCALATION_MODEL], "keys": [], "paid_fallback": True, "force_paid": True, "thinking_level": "medium"},
     "rag":             {"models": RAG_MODELS,         "keys": FREE_API_KEYS, "paid_fallback": True},
     "crosscheck":       {"models": CROSSCHECK_MODELS,  "keys": FREE_API_KEYS, "paid_fallback": True},
     # "synthesis" stage config is built dynamically in synthesize.py from

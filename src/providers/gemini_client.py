@@ -104,6 +104,8 @@ class GeminiClient(BaseProvider):
         if stage == "extract" and self.model_override:
             models = [self.model_override] + [m for m in models if m != self.model_override]
 
+        thinking_level = cfg.get("thinking_level")
+
         key_sequence = self.key_manager.sequence(
             force_paid=cfg.get("force_paid", False),
             paid_fallback=cfg.get("paid_fallback", True),
@@ -120,7 +122,10 @@ class GeminiClient(BaseProvider):
                     try:
                         Logger.info(f"[{stage}] Trying {model} (attempt {attempt + 1})")
 
-                        response = self._generate(client, model, prompt, schema, file_path, images)
+                        response = self._generate(
+                            client, model, prompt, schema, file_path, images,
+                            thinking_level=thinking_level,
+                        )
 
                         if stage == "extract":
                             self.active_model = model
@@ -254,6 +259,7 @@ class GeminiClient(BaseProvider):
         schema: Optional[Type[BaseModel]],
         file_path: Optional[str],
         images: Optional[List[bytes]] = None,
+        thinking_level: Optional[str] = None,
     ):
         contents = [prompt]
 
@@ -267,6 +273,14 @@ class GeminiClient(BaseProvider):
             ]
             contents = image_parts + contents
 
+        # thinking_level is None for every existing stage -- only
+        # verify_escalate (STAGE_CONFIG in config.py) sets it, and that
+        # stage's model list is exclusively the Pro escalation model, so
+        # this never reaches a Flash-tier call.
+        thinking_config = (
+            types.ThinkingConfig(thinking_level=thinking_level) if thinking_level else None
+        )
+
         if schema:
             response = client.models.generate_content(
                 model=model,
@@ -274,6 +288,7 @@ class GeminiClient(BaseProvider):
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=schema,
+                    thinking_config=thinking_config,
                 ),
             )
             return response.parsed
@@ -281,5 +296,6 @@ class GeminiClient(BaseProvider):
         response = client.models.generate_content(
             model=model,
             contents=contents,
+            config=types.GenerateContentConfig(thinking_config=thinking_config) if thinking_config else None,
         )
         return response.text
