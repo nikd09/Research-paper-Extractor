@@ -102,9 +102,17 @@ When you write this into prose (Markdown or chunk content), you MUST:
       - "crosscheck_mismatch" -> add
         "(unconfirmed -- independent extraction disagreed)".
       - "contradicts_table" -> present BOTH conflicting records explicitly,
-        do not pick one -- e.g. "(discrepancy: prose states 49.5%; Table 6
-        implies 33.1% -- not resolved)". Never silently render only one of
-        the two numbers.
+        do not pick one. This applies whether the disagreement is between
+        prose and a table (e.g. "(discrepancy: prose states 49.5%; Table 6
+        implies 33.1% -- not resolved)") OR between two prose locations
+        (e.g. "(discrepancy: the abstract states a 50% reduction; Section
+        3.2 states 47.9% for the same comparison -- not resolved)"). Never
+        silently render only one of the two numbers.
+      - "derived" -> state the value with its derivation explicit in the
+        text, e.g. "5.0E-5 (derived from the paper's stated 50% reduction
+        relative to 2.50E-5)". Never present a calculated value as if it
+        were directly stated by the paper -- the derivation must stay
+        visible in the sentence, not just in the underlying `source` field.
       - "not_reported" -> write "Not Reported", do not omit the record
         silently; the absence of data is itself useful information.
   - Never merge multiple materials' values into one summarized range or
