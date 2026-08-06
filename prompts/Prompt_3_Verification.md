@@ -228,16 +228,39 @@ previous guess in place unexamined:
 Use the FIGURE MANIFEST to find which attached image has that figure. Read the value from
 the plotted data point against its axis gridlines.
 
-If you can read it precisely, keep `value` exactly as plotted and set
-`confidence = "confirmed"`.
+If the number is PRINTED AS TEXT directly on the chart (a data label
+attached to that specific bar/point/series), keep `value` exactly as
+printed and set `confidence = "confirmed"` -- a printed data label is as
+authoritative as a table cell, never downgrade it just because it came
+from a figure. Confirmed real failure mode: a printed chart label of
+"0.564" was extracted as "~0.56" with `confidence = "approximate"` --
+that is wrong; if the number is printed on the chart, use it exactly and
+mark it confirmed.
 
-If the chart has no exact gridline/label at that point (you are visually
-interpolating), prefix `value` with "~" and set `confidence = "approximate"`
--- do not present an interpolated chart reading as `confirmed`.
+If the chart has NO printed label at that point and you are visually
+interpolating between gridlines, prefix `value` with "~" and set
+`confidence = "approximate"` -- do not present an interpolated chart
+reading as `confirmed`. "approximate" applies only to values with no
+printed label; it is never correct for a value you can read verbatim off
+a printed data label.
 
 If the FIGURE MANIFEST does not list that figure among the attached images,
 set `value = "Not Reported"` and `confidence = "not_reported"`. Never state
 a number for data you did not actually see plotted.
+
+Completeness check -- confirmed real failure mode: a chart with 6 data
+series each carrying a printed numeric label had only 2 of 6 series
+extracted; the 4 series that existed ONLY as chart labels (never restated
+in body text) were silently dropped, with no confidence flag and no trace
+that they were ever skipped. When a chart has a printed numeric label for
+EACH of its series/bars/points, every one of them must have a matching
+`performance.*` record -- not only the ones also mentioned in prose. Before
+finalizing, count the number of distinct labeled series/bars/points visible
+in the figure and compare it against the number of extracted records that
+cite that figure as their `source`. If the extracted count is lower, you
+have found a real gap the earlier extraction pass missed -- add the missing
+records now, using the printed labels, per rule 8 above ("If information
+exists in the paper but is missing from the JSON, add it.").
 
 ------------------------------------------------------------
 
