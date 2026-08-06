@@ -1,5 +1,6 @@
 from typing import List, Optional, Type
 
+import httpx
 from google import genai
 from google.genai import types
 from google.genai.errors import ClientError, ServerError
@@ -137,9 +138,20 @@ class GeminiClient(BaseProvider):
 
                         return response
 
-                    except (ServerError, ClientError) as e:
+                    except (ServerError, ClientError, httpx.HTTPError) as e:
+                        # httpx.HTTPError (ReadTimeout, ConnectTimeout,
+                        # ConnectError, etc.) is a raw transport-layer
+                        # failure, not a google.genai.errors.ServerError/
+                        # ClientError -- confirmed bug: without catching it
+                        # here too, a network timeout on attempt 1 escaped
+                        # this whole retry/model-cascade/key-rotation loop
+                        # entirely and crashed the pipeline run, even though
+                        # MAX_RETRIES and the next model/key were right
+                        # there unused. Treat it like any other transient
+                        # failure: retry, then fall through to the next
+                        # model/key.
                         last_error = e
-                        if _is_rate_limit_error(e):
+                        if isinstance(e, (ServerError, ClientError)) and _is_rate_limit_error(e):
                             self.key_manager.mark_exhausted(api_key)
                             break  # stop retrying this model on this key, rotate key instead
                         Logger.warning(f"[{stage}] {model} failed: {e}")
@@ -206,9 +218,14 @@ class GeminiClient(BaseProvider):
 
                             return response
 
-                        except (ServerError, ClientError) as e:
+                        except (ServerError, ClientError, httpx.HTTPError) as e:
+                            # See matching comment in generate() above --
+                            # httpx.HTTPError (timeouts, connection resets)
+                            # must be caught here too or it escapes the
+                            # cascade entirely instead of falling through
+                            # to the next model/step.
                             last_error = e
-                            if _is_rate_limit_error(e):
+                            if isinstance(e, (ServerError, ClientError)) and _is_rate_limit_error(e):
                                 if is_free_pool:
                                     self.key_manager.mark_exhausted(api_key)
                                 break  # stop retrying this model on this key
