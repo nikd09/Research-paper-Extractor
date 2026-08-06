@@ -1,0 +1,126 @@
+@import 'tailwindcss';
+
+/* IBM Plex, self-hosted. Three widths from one family: condensed for
+   display, regular for body, mono for every number on the site. */
+@import '@fontsource/ibm-plex-sans-condensed/500.css';
+@import '@fontsource/ibm-plex-sans-condensed/600.css';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+@theme {
+  /* --- housing ------------------------------------------------------ */
+  --color-ground: #0e1216;
+  --color-panel: #161d24;
+  --color-panel-2: #1b242c;
+  --color-line: #2a353f;
+  --color-line-bright: #3b4a57;
+  --color-text: #dfe5e9;
+  --color-dim: #9dabb6;
+  --color-dimmer: #7e8b96;
+
+  /* --- semantics ---------------------------------------------------- */
+  /* structure, interaction, focus */
+  --color-signal: #5fa8c4;
+  --color-signal-dim: #3d6d80;
+  /* RESERVED: anything that costs money. Nothing else. */
+  --color-copper: #c08552;
+  --color-copper-dim: #7a5433;
+
+  /* --- confidence legend (a lab stamp system, used nowhere else) ----- */
+  --color-confirmed: #79b79a;
+  --color-approximate: #d6a648;
+  --color-unverified: #8f95c6;
+  /* mismatch and not-reported are lightened from the first pass: the
+     original values landed at 4.35:1 and 3.7:1 on --panel. */
+  --color-mismatch: #d18075;
+  --color-contradicts: #c4899f;
+  --color-notreported: #9aa5ad;
+
+  --font-display: 'IBM Plex Sans Condensed', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-ground);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* The engineering-instrument grain: a faint graph rule behind everything,
+     never bright enough to fight the text. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--color-line) 40%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--color-line) 40%, transparent) 1px, transparent 1px);
+    background-size: 96px 96px;
+    mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black, transparent 75%);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-signal) 35%, transparent);
+    color: var(--color-text);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  /* Numbers are the subject. They set in mono, everywhere. */
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+/* Reduced motion means static, not merely faster. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
