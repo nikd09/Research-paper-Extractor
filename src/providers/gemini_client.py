@@ -1,3 +1,4 @@
+import time
 from typing import List, Optional, Type
 
 import httpx
@@ -14,6 +15,7 @@ from src.utils.config import (
     STAGE_CONFIG,
     MAX_RETRIES,
     REQUEST_TIMEOUT,
+    RETRY_BACKOFF_BASE_SECONDS,
 )
 from src.utils.logger import Logger
 
@@ -155,6 +157,10 @@ class GeminiClient(BaseProvider):
                             self.key_manager.mark_exhausted(api_key)
                             break  # stop retrying this model on this key, rotate key instead
                         Logger.warning(f"[{stage}] {model} failed: {e}")
+                        if attempt < MAX_RETRIES - 1:
+                            delay = RETRY_BACKOFF_BASE_SECONDS * (2 ** attempt)
+                            Logger.info(f"[{stage}] Backing off {delay}s before retrying {model}...")
+                            time.sleep(delay)
                         continue
 
         raise RuntimeError(
@@ -230,6 +236,10 @@ class GeminiClient(BaseProvider):
                                     self.key_manager.mark_exhausted(api_key)
                                 break  # stop retrying this model on this key
                             Logger.warning(f"[{stage}] {model} failed: {e}")
+                            if attempt < MAX_RETRIES - 1:
+                                delay = RETRY_BACKOFF_BASE_SECONDS * (2 ** attempt)
+                                Logger.info(f"[{stage}] Backing off {delay}s before retrying {model}...")
+                                time.sleep(delay)
                             continue
 
         raise RuntimeError(
