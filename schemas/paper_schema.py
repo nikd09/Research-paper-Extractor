@@ -183,10 +183,22 @@ class MetricValue(BaseModel):
     #   crosscheck_mismatch - an independent second extraction found a
     #                        different value for this same material/
     #                        condition and neither could be confirmed
-    #   contradicts_table   - a prose-stated value and a table/figure-stated
-    #                        value for the same material/condition disagree;
-    #                        both records are kept (one per source) rather
+    #   contradicts_table   - two records for the same material/condition
+    #                        disagree -- prose vs. table/figure, OR prose
+    #                        vs. prose (e.g. abstract states "50% lower",
+    #                        results section states "47.9% lower" for the
+    #                        same comparison). Despite the name, this
+    #                        applies to any same-comparison disagreement,
+    #                        not only ones involving a table. Both
+    #                        records are kept (one per source) rather
     #                        than one being silently dropped or preferred
+    #   derived             - calculated from a stated percentage/ratio and
+    #                        a stated baseline, rather than read directly
+    #                        (e.g. paper states "2.5E-5, 50% lower than X"
+    #                        -> computed X = 5.0E-5). NEVER "confirmed" --
+    #                        confirmed is reserved for values that appear
+    #                        as literal text/table/chart-label content.
+    #                        `source` must name what it was derived from.
     #   not_reported        - genuinely not recoverable; value should read
     #                        "Not Reported"
     confidence: str = "unverified"

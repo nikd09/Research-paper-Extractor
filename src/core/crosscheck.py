@@ -111,7 +111,9 @@ class CrossChecker:
                     # so don't let crosscheck downgrade it. "contradicts_table"
                     # is an already-flagged prose/table discrepancy -- don't
                     # let a second independent extraction paper over it by
-                    # confirming one side.
+                    # confirming one side. "derived" is NOT in this skip set
+                    # -- see the dedicated branch below, it still gets
+                    # compared, just handled differently from a normal value.
                     continue
 
                 primary_numbers = _numbers_of(mv)
@@ -128,7 +130,28 @@ class CrossChecker:
                     and _condition_overlap(mv.condition, match.condition) == 0
                 )
 
-                if primary_numbers & match_numbers and not condition_mismatch:
+                agrees = bool(primary_numbers & match_numbers) and not condition_mismatch
+
+                if mv.confidence == "derived":
+                    # A derived value was CALCULATED, not read -- it must
+                    # never be promoted to "confirmed" just because an
+                    # independent extraction agrees (confirmed is reserved
+                    # for literal text/table/chart-label content). But
+                    # disagreement IS a meaningful signal here: if the
+                    # secondary extraction independently derived (or read)
+                    # a different number for the same material/condition,
+                    # the primary derivation may have picked the wrong
+                    # percentage or made an arithmetic error -- flag it
+                    # exactly like any other mismatch instead of silently
+                    # trusting a computed value forever.
+                    if agrees:
+                        pass  # stays "derived" -- corroborated, not upgraded
+                    else:
+                        mv.confidence = "crosscheck_mismatch"
+                        flagged += 1
+                    continue
+
+                if agrees:
                     # Independent pass found the same number for the
                     # closest-matching material/condition -- treat as
                     # confirmed even though it wasn't in raw text (it's

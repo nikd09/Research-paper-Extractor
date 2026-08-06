@@ -175,11 +175,15 @@ class NumericValidator:
         grounded_n, ungrounded_n = 0, 0
 
         for mv in values:
-            if mv.confidence in ("approximate", "not_reported", "contradicts_table"):
+            if mv.confidence in ("approximate", "not_reported", "contradicts_table", "derived"):
                 # Already explicitly handled by the extraction/verify step
-                # (e.g. a chart read with no exact gridline, or genuinely
-                # unrecoverable, or a flagged prose/table discrepancy) --
-                # don't downgrade or override those.
+                # (e.g. a chart read with no exact gridline, a genuinely
+                # unrecoverable value, a flagged prose/table discrepancy,
+                # or a value calculated from a stated percentage/ratio) --
+                # don't downgrade or override those. "derived" in
+                # particular is a value the pipeline computed itself, so
+                # it will usually NOT appear verbatim in source_text --
+                # that's expected, not a grounding failure.
                 grounded_n += 1
                 continue
 
