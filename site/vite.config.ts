@@ -19,7 +19,7 @@ export default defineConfig({
       // copy of index.html hands the URL back to the router.
       name: 'spa-404-fallback',
       closeBundle() {
-        const dist = resolve(__dirname, 'dist')
+        const dist = resolve(import.meta.dirname, 'dist')
         copyFileSync(resolve(dist, 'index.html'), resolve(dist, '404.html'))
       },
     },

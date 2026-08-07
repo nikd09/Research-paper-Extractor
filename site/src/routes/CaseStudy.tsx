@@ -130,7 +130,7 @@ export function CaseStudy() {
         </div>
 
         <p className="mt-5 max-w-[68ch] text-sm text-dim">
-          Six of these ten rows are fluoropolymer-bearing, including every one of the lowest friction
+          Seven of these ten rows are fluoropolymer-bearing, including every one of the lowest friction
           coefficients in the set. The compliance flag doesn’t solve that; it just stops it being
           invisible. What’s left after the filter — the Kevlar-reinforced epoxy at 0.07–0.09, the
           commercial polymer bushings around 0.124 — is the honest shortlist.
