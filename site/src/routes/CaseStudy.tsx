@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ConfidenceStamp } from '../components/ConfidenceStamp'
 import { PullQuote } from '../components/PullQuote'
 import { Eyebrow, PageHead, Panel, Prose, SectionHead } from '../components/primitives'
@@ -5,6 +6,13 @@ import { BENCHMARKS, EXTRACTED, SPEC, SYNTHESIS_DIFF } from '../content/caseStud
 import { QUOTES } from '../content/quotes'
 
 export function CaseStudy() {
+  const [pfasFreeOnly, setPfasFreeOnly] = useState(false)
+  const [confirmedOnly, setConfirmedOnly] = useState(false)
+
+  const filteredRows = EXTRACTED.filter(
+    (row) => (!pfasFreeOnly || !row.pfas) && (!confirmedOnly || row.confidence === 'confirmed'),
+  )
+
   return (
     <div className="space-y-24 md:space-y-32">
       <PageHead
@@ -93,6 +101,40 @@ export function CaseStudy() {
           </p>
         </SectionHead>
 
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div role="group" aria-label="Filter extracted values" className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setPfasFreeOnly((v) => !v)}
+              aria-pressed={pfasFreeOnly}
+              className={`border px-2.5 py-1 font-mono text-[0.6875rem] tracking-wide transition-colors ${
+                pfasFreeOnly
+                  ? 'border-signal/50 bg-signal/15 text-signal'
+                  : 'border-line-bright text-dim hover:bg-panel-2'
+              }`}
+            >
+              PFAS-free only
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmedOnly((v) => !v)}
+              aria-pressed={confirmedOnly}
+              className={`border px-2.5 py-1 font-mono text-[0.6875rem] tracking-wide transition-colors ${
+                confirmedOnly
+                  ? 'border-confirmed/50 bg-confirmed/15 text-confirmed'
+                  : 'border-line-bright text-dim hover:bg-panel-2'
+              }`}
+            >
+              confirmed only
+            </button>
+          </div>
+          {(pfasFreeOnly || confirmedOnly) && (
+            <span className="font-mono text-[0.6875rem] text-dimmer">
+              {filteredRows.length} of {EXTRACTED.length} rows
+            </span>
+          )}
+        </div>
+
         <div className="overflow-x-auto border border-line" tabIndex={0} role="region" aria-label="Extracted values table">
           <table className="w-full min-w-[52rem] border-collapse text-left text-sm">
             <thead>
@@ -105,7 +147,14 @@ export function CaseStudy() {
               </tr>
             </thead>
             <tbody>
-              {EXTRACTED.map((row, i) => (
+              {filteredRows.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-dim">
+                    No rows match both filters.
+                  </td>
+                </tr>
+              )}
+              {filteredRows.map((row, i) => (
                 <tr key={i} className="border-b border-line bg-panel last:border-0">
                   <td className="px-4 py-3">{row.material}</td>
                   <td className="px-4 py-3 font-mono text-xs text-dim">{row.condition}</td>
