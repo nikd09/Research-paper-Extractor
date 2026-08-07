@@ -144,4 +144,50 @@ REQUIREMENTS_DIR = Path("docs/requirements")`,
       'A stricter caption pattern runs first: figure number, then a period or colon, then a capital letter or an opening paren — which is what a caption looks like and what a mid-sentence citation doesn’t. First-mention survives only as a fallback, and when it’s used the log says so, because a fallback page is not a confirmed caption page.',
     file: 'src/core/figure_extractor.py',
   },
+  {
+    id: 'chartgap',
+    marker: 'v3.0 · chart completeness',
+    title: 'Six series on a chart, and the extraction found two of them',
+    severity: 'silent-pass',
+    broke:
+      'A figure with six data series, each carrying a printed numeric label, came back with two extracted records. The four series that existed only as chart labels — never restated anywhere in body text — were silently dropped: no confidence flag, no note, no trace in the output that anything had been skipped. Separately, a printed chart label reading “0.564” was extracted as “~0.56” with confidence approximate — under-confident, since a number printed directly on a chart is as authoritative as a table cell, not a gridline interpolation.',
+    found:
+      'By hand, the way most of these are — counting labeled points on the actual figure and counting matching records in the JSON. Six and two.',
+    changed:
+      'Two prompt-level fixes, no code. The extraction prompt gained a rule that every labeled series, bar or point in a multi-series chart becomes its own record, whether or not prose ever restates it — with a count-and-compare self-check before the model finalizes an answer. The verify prompt, which should have caught the gap and had no completeness check at all, got the same self-check plus the 6-series/2-extracted failure mode named as an anti-pattern to test against. Both prompts also sharpened the line between the two states: a number printed as text on the chart is confirmed at its exact printed value; approximate now applies only to genuine between-gridline interpolation with no printed label present.',
+    code: {
+      lang: 'markdown',
+      caption: 'prompts/Prompt_3_Verification.md — the completeness check, added',
+      source: `Completeness check -- confirmed real failure mode: a chart with 6 data
+series each carrying a printed numeric label had only 2 of 6 series
+extracted, with no confidence flag and no trace they were skipped.
+Count the labeled series/bars/points in the figure and compare it
+against the extracted records citing that figure as source. If the
+extracted count is lower, add the missing records now.`,
+    },
+    file: 'prompts/Prompt_12_Understand_And_Extract.md · prompts/Prompt_3_Verification.md',
+  },
+  {
+    id: 'derived',
+    marker: 'v3.0 · derived confidence',
+    title: 'A number the pipeline calculated wore the same stamp as one it had read',
+    severity: 'silent-pass',
+    broke:
+      'The extraction was doing arithmetic — reading “2.5E-5, a 50% reduction from X” and computing X = 5.0E-5 — and then labeling the computed value confirmed, as if it had been read verbatim off the page. Nothing in the record distinguished a number the paper stated from a number the pipeline had derived itself. A related gap sat next to it: the existing prose-vs-table contradiction rule had no equivalent for prose-vs-prose, so two different stated percentages for the same comparison in two different places — abstract versus results section — silently collapsed to one, with no contradiction flagged.',
+    found:
+      'By hand, reading extracted output against the paper it came from, the same way as the chart-completeness gap above.',
+    changed:
+      'A new confidence state, derived, for a value calculated from a stated percentage or ratio rather than read directly — never confirmed, and source must name what it was computed from. validator.py adds it to the skip-set so the grounding check doesn’t clobber a legitimately-computed value back to unverified for not appearing verbatim. crosscheck.py deliberately does NOT skip it the same way: a dedicated branch lets a second independent extraction still contest a bad derivation. Agreement leaves the value at derived, never promoted. Disagreement flags crosscheck_mismatch, same as any other contested value — a second wrong derivation is still real evidence something’s off.',
+    code: {
+      lang: 'python',
+      caption: 'src/core/crosscheck.py — the branch a computed value gets instead of the skip',
+      source: `if mv.confidence == "derived":
+    if agrees:
+        pass  # stays "derived" -- corroborated, not upgraded
+    else:
+        mv.confidence = "crosscheck_mismatch"
+    continue`,
+    },
+    file: 'src/core/crosscheck.py · src/core/validator.py · schemas/paper_schema.py',
+  },
 ]
