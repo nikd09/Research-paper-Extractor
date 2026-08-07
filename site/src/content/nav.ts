@@ -45,10 +45,10 @@ export const TABS: TabDef[] = [
     blurb: 'Key pools, 429s, and why a clean paper is free.',
   },
   {
-    path: '/status',
-    label: 'Status & limits',
+    path: '/usage-guide',
+    label: 'Using the GUI',
     ord: '08',
-    blurb: 'What runs, what is tested, what is not.',
+    blurb: 'Four real screenshots — folders, a run, and the console that narrates it.',
   },
 ]
 
