@@ -26,8 +26,8 @@ export default function App() {
   useEffect(() => {
     document.title =
       pathname === '/'
-        ? 'Assay — a verification-first extraction engine'
-        : `${active.label} — Assay`
+        ? 'The Multi-Tier Verification & Extraction Pipeline'
+        : `${active.label} — The Multi-Tier Verification & Extraction Pipeline`
   }, [pathname, active.label])
 
   return (
@@ -44,9 +44,12 @@ export default function App() {
       <header className="sticky top-0 z-40 border-b border-line bg-ground/92 backdrop-blur-sm">
         <div className="mx-auto w-full max-w-[1180px] px-4 md:px-8">
           <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 pt-4 pb-2">
-            <div className="flex items-baseline gap-3">
-              <span className="font-display text-lg font-semibold tracking-[0.14em] uppercase">
-                Assay
+            {/* the old wordmark ("Assay", 5 letters, uppercase+tracked like a
+                logotype) doesn't survive a name this long -- readable size,
+                normal case, and room to wrap instead. */}
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="font-display text-base leading-snug font-semibold sm:text-lg">
+                The Multi-Tier Verification &amp; Extraction Pipeline
               </span>
               <span className="hidden font-mono text-[0.6875rem] text-dim sm:inline">
                 v3.0 · knowledge extraction with provenance
@@ -85,7 +88,8 @@ export default function App() {
       <footer className="border-t border-line">
         <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-4 px-4 py-8 font-mono text-xs text-dimmer md:px-8">
           <span>
-            Assay · pipeline v3.0 · first configured instance: seat recliner sliding layer
+            The Multi-Tier Verification &amp; Extraction Pipeline · v3.0 · first configured
+            instance: seat recliner sliding layer
           </span>
           <span>Built by Nik. Every number on this site came out of the repo.</span>
         </div>

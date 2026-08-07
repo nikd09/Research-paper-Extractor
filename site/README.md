@@ -1,4 +1,4 @@
-# Assay — project site
+# The Multi-Tier Verification & Extraction Pipeline — project site
 
 The site for the extraction engine in this repo. Eight URL-routed tabs covering the
 verification model, the architecture, the domain-pack question, the seat recliner case

@@ -5,7 +5,7 @@ import { Highlight, type PrismTheme } from 'prism-react-renderer'
  * hue and no copper appears in code, so those two legends keep meaning
  * exactly one thing on the page.
  */
-const assayTheme: PrismTheme = {
+const codeTheme: PrismTheme = {
   plain: { color: '#c8d2da', backgroundColor: 'transparent' },
   styles: [
     { types: ['comment', 'prolog', 'doctype', 'cdata'], style: { color: '#8b98a3', fontStyle: 'italic' } },
@@ -41,7 +41,7 @@ export function CodeBlock({ code, lang = 'python', caption, numbered = false }: 
       {/* tabIndex: a scroll container needs to be reachable, or a keyboard
           user can't scroll a wide line into view. */}
       <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={caption ?? 'Code'}>
-        <Highlight code={code.trim()} language={lang} theme={assayTheme}>
+        <Highlight code={code.trim()} language={lang} theme={codeTheme}>
           {({ tokens, getLineProps, getTokenProps }) => (
             // w-max, not min-w-max: a min-width propagates up through the
             // scroll container and widens the whole page on narrow screens.

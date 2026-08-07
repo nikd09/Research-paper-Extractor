@@ -19,7 +19,7 @@ export function Overview() {
       {/* ------------------------------------------------ thesis */}
       <section className="grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
         <div>
-          <Eyebrow className="mb-4">Assay · a knowledge extraction engine</Eyebrow>
+          <Eyebrow className="mb-4">The Multi-Tier Verification &amp; Extraction Pipeline</Eyebrow>
           <h1 className="text-4xl leading-[1.02] font-semibold md:text-[3.75rem]">
             Fluency and correctness are uncorrelated.
           </h1>
@@ -44,7 +44,8 @@ export function Overview() {
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
           <Prose>
             <p>
-              Assay reads technical PDFs and emits structured knowledge in which every numeric claim
+              The Multi-Tier Verification &amp; Extraction Pipeline reads technical PDFs and emits
+              structured knowledge in which every numeric claim
               carries machine-checkable provenance and a confidence state. A value isn’t a string in
               a list — it’s a record that knows which material it belongs to, under what test
               condition, in what unit, where in the document it came from, and how strongly that
