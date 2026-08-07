@@ -13,6 +13,12 @@ const TONE: Record<ConfidenceKey, { text: string; border: string; bg: string; do
     bg: 'bg-approximate/10',
     dot: 'bg-approximate',
   },
+  derived: {
+    text: 'text-derived',
+    border: 'border-derived/45',
+    bg: 'bg-derived/10',
+    dot: 'bg-derived',
+  },
   unverified: {
     text: 'text-unverified',
     border: 'border-unverified/45',
@@ -46,7 +52,7 @@ interface Props {
 }
 
 /**
- * The lab stamp. These six hues appear nowhere else on the site, so a reader
+ * The lab stamp. These seven hues appear nowhere else on the site, so a reader
  * can learn the legend once and then read trust off colour alone.
  */
 export function ConfidenceStamp({ state, size = 'sm', className = '' }: Props) {

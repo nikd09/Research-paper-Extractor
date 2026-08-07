@@ -25,6 +25,16 @@ export const CONFIDENCE_STATES: ConfidenceState[] = [
     consequence: 'Usable for ranking, not for a spec sheet. Downstream text keeps the ~.',
   },
   {
+    key: 'derived',
+    label: 'derived',
+    tone: 'derived',
+    meaning:
+      'Calculated from a stated percentage or ratio and a stated baseline — e.g. the paper says “2.5E-5, a 50% reduction from X”, and X is computed. Never read directly, so never confirmed.',
+    setBy: 'extract (free) — crosscheck can knock it down to crosscheck_mismatch, but nothing can promote it to confirmed',
+    consequence:
+      'Usable, but the arithmetic must stay visible in the rendered sentence, not buried in a source field. A second independent derivation that disagrees is a real flag, not noise.',
+  },
+  {
     key: 'unverified',
     label: 'unverified',
     tone: 'unverified',
@@ -80,7 +90,7 @@ export const MECHANISMS: Mechanism[] = [
   {
     id: 'crosscheck',
     name: 'Independent crosscheck',
-    model: 'gemini-3.5-flash-lite',
+    model: 'gemini-3.5-flash-lite → gemini-3.6-flash',
     tier: 'free',
     cost: 'free tier, one call per paper',
     authority:
@@ -163,6 +173,20 @@ export const PRECEDENCE_CODE = `for mv in primary_values:
         # signal than an independent Flash-Lite re-extraction,
         # so don't let crosscheck downgrade it.
         continue`
+
+/**
+ * "derived" is deliberately NOT in the skip list above -- a computed value
+ * still needs checking, just not by the same rule. src/core/crosscheck.py:135
+ */
+export const DERIVED_BRANCH_CODE = `if mv.confidence == "derived":
+    # Calculated, not read -- can be corroborated but never
+    # promoted to "confirmed" just because a second extraction
+    # agrees.
+    if agrees:
+        pass  # stays "derived"
+    else:
+        mv.confidence = "crosscheck_mismatch"
+    continue`
 
 /** Why the default is the hedged state and not the confident one. */
 export const FAIL_CLOSED_CODE = `class MetricValue(BaseModel):

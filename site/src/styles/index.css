@@ -31,6 +31,7 @@
   /* --- confidence legend (a lab stamp system, used nowhere else) ----- */
   --color-confirmed: #79b79a;
   --color-approximate: #d6a648;
+  --color-derived: #a3b563;
   --color-unverified: #8f95c6;
   /* mismatch and not-reported are lightened from the first pass: the
      original values landed at 4.35:1 and 3.7:1 on --panel. */

@@ -14,6 +14,7 @@ import {
 } from '../components/primitives'
 import {
   CONFIDENCE_STATES,
+  DERIVED_BRANCH_CODE,
   FAIL_CLOSED_CODE,
   MECHANISMS,
   PRECEDENCE_CODE,
@@ -44,7 +45,7 @@ export function Verification() {
 
       {/* ------------------------------------------------ states */}
       <section>
-        <SectionHead ord="3.1" title="Six states, one field">
+        <SectionHead ord="3.1" title="Seven states, one field">
           <p>
             Every extracted number is a record, not a string — material, condition, value, unit,
             source, and one confidence state. The state is a first-class field because the previous
@@ -79,7 +80,10 @@ export function Verification() {
           <span className="font-mono text-contradicts">contradicts_table</span> came later, when a
           paper turned out to state one number in its prose and a different one in its own table for
           the same material. Neither is wrong to extract. Picking a winner silently would have made
-          the paper’s inconsistency look like mine.
+          the paper’s inconsistency look like mine.{' '}
+          <span className="font-mono text-derived">derived</span> came later still, for the values
+          the pipeline calculates itself — a stated baseline back-computed from a stated percentage
+          reduction — which is a different kind of unverified from a value nobody could find at all.
         </p>
       </section>
 
@@ -120,6 +124,30 @@ export function Verification() {
             <CodeBlock
               code={PRECEDENCE_CODE}
               caption="src/core/crosscheck.py — the four lines the ladder rests on"
+            />
+          </div>
+        </div>
+
+        <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start">
+          <Prose>
+            <p>
+              <span className="font-mono text-derived">derived</span> is the one state that
+              deliberately does not take that skip. A calculated value still needs checking — it
+              just needs a different check than a read one, because agreement can’t promote it and
+              disagreement still means something. If the independent extraction derives (or reads) a
+              different number for the same material and condition, that is a real signal that the
+              primary derivation picked the wrong percentage or made an arithmetic error.
+            </p>
+            <p>
+              So crosscheck gives it its own branch instead of a skip. Agreement leaves it exactly
+              where it was — <span className="font-mono text-derived">derived</span>, never upgraded.
+              Disagreement flags it, same as any other mismatched value.
+            </p>
+          </Prose>
+          <div>
+            <CodeBlock
+              code={DERIVED_BRANCH_CODE}
+              caption="src/core/crosscheck.py — the branch a computed value gets instead of the skip"
             />
           </div>
         </div>
