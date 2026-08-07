@@ -9,7 +9,7 @@ import { DomainPacks } from './routes/DomainPacks'
 import { CaseStudy } from './routes/CaseStudy'
 import { EngineeringLog } from './routes/EngineeringLog'
 import { CostOps } from './routes/CostOps'
-import { Status } from './routes/Status'
+import { UsageGuide } from './routes/UsageGuide'
 
 function ScrollReset() {
   const { pathname } = useLocation()
@@ -80,7 +80,7 @@ export default function App() {
           <Route path="/case-study" element={<CaseStudy />} />
           <Route path="/engineering-log" element={<EngineeringLog />} />
           <Route path="/cost-ops" element={<CostOps />} />
-          <Route path="/status" element={<Status />} />
+          <Route path="/usage-guide" element={<UsageGuide />} />
           <Route path="*" element={<Overview />} />
         </Routes>
       </main>

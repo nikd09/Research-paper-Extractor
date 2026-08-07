@@ -7,6 +7,7 @@
 export type ConfidenceKey =
   | 'confirmed'
   | 'approximate'
+  | 'derived'
   | 'unverified'
   | 'crosscheck_mismatch'
   | 'contradicts_table'

@@ -8,7 +8,7 @@ import { CONFIDENCE_STATES } from '../content/confidence'
 const GLANCE = [
   { n: '7', label: 'pipeline stages', sub: 'two of them make no API call' },
   { n: '3', label: 'verification mechanisms', sub: 'ranked, not stacked' },
-  { n: '6', label: 'confidence states', sub: 'one field, no free-text tags' },
+  { n: '7', label: 'confidence states', sub: 'one field, no free-text tags' },
   { n: '3', label: 'output artifacts', sub: 'JSON · markdown · retrieval chunks' },
   { n: '0', label: 'paid calls, clean paper', sub: 'escalation only runs on flags', copper: true },
 ]
@@ -103,7 +103,7 @@ export function Overview() {
       <section>
         <SectionHead ord="1.2" title="The confidence legend">
           <p>
-            These six hues appear nowhere else on this site, and copper is reserved for anything
+            These seven hues appear nowhere else on this site, and copper is reserved for anything
             that costs money. Two minutes here and you can read trust and cost off colour alone.
           </p>
         </SectionHead>
