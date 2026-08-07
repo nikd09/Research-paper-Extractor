@@ -262,6 +262,20 @@ have found a real gap the earlier extraction pass missed -- add the missing
 records now, using the printed labels, per rule 8 above ("If information
 exists in the paper but is missing from the JSON, add it.").
 
+A confirmed prose percentage-reduction record (rule 9a of the extraction
+prompt) is never a substitute for that same figure's chart-read absolute
+values -- they are two separate, both-required records. If the JSON has a
+percentage-reduction claim referencing a figure (e.g. "wear rate decreased
+by 92%") but is missing that figure's own plotted absolute values for the
+materials involved, that is the same completeness-check failure mode above:
+go read the figure and add the missing `performance.*` records, do not
+treat the percentage record as sufficient on its own. Confirmed real
+regression: a JSON kept three confirmed prose percentage records for a
+multi-series figure while all eight of that figure's plotted absolute
+values (previously extracted as `approximate`) had vanished -- the
+percentage claims had displaced the chart data instead of sitting
+alongside it.
+
 ------------------------------------------------------------
 
 9b.
