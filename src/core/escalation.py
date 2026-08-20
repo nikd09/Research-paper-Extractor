@@ -1,16 +1,16 @@
 """
-Last-resort escalation to the paid Pro model -- now operating on
-structured MetricValue.confidence instead of scanning value strings for
-"[unverified]"/"[crosscheck]" text tags.
+Last-resort escalation to a high-thinking-budget Flash pass -- now
+operating on structured MetricValue.confidence instead of scanning value
+strings for "[unverified]"/"[crosscheck]" text tags.
 
-Runs AFTER: extract (Flash/free) -> verify (Flash/free, figure-targeted) ->
-NumericValidator (Fix #1) -> crosscheck (Flash-Lite/free, multimodal,
-per-entry).
+Runs AFTER: extract (Flash, free-tier) -> verify (Flash, free-tier,
+figure-targeted) -> NumericValidator (Fix #1) -> crosscheck (Flash-Lite,
+free-tier, multimodal, per-entry).
 
 Only entries still carrying confidence in {"unverified", "crosscheck_mismatch"}
 after all of that get sent here -- not the whole paper, not even the whole
 performance section. If nothing is flagged, this makes ZERO API calls: a
-clean extraction never touches the paid key at all.
+clean extraction never reaches this stage at all.
 """
 
 from typing import Dict, List, Tuple
@@ -55,8 +55,8 @@ class Escalator:
         total_flagged = sum(len(v) for v in flagged.values())
         Logger.warning(
             f"[escalation] {total_flagged} value(s) still flagged after free-tier "
-            f"verify + crosscheck -- escalating to Pro (paid) for these specific "
-            f"values only."
+            f"verify + crosscheck -- escalating to the high-thinking pass for "
+            f"these specific values only."
         )
 
         def _describe(mv: MetricValue) -> str:
