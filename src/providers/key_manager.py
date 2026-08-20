@@ -1,18 +1,20 @@
 """
-Free-tier-first key rotation.
+Free-tier-only sequential key cascade.
 
-Round-robins within a stage's free-key pool. On 429 / RESOURCE_EXHAUSTED,
-marks that key exhausted until the next daily reset (midnight Pacific) and
-moves to the next free key. Only once every free key in the pool is marked
-exhausted does it fall through to the paid key.
+Tries GEMINI_API_KEY_1, then _2, then _4, in that fixed order, uniformly
+for every pipeline stage -- there is no separate "paid" pool any more; key
+#4 used to be held back as a forced-paid last resort, it's now just the
+third key in the same cascade. On 429 / RESOURCE_EXHAUSTED, marks that key
+exhausted until the next daily reset (midnight Pacific) and moves to the
+next key in the list.
 
-Rate limits are per Google Cloud PROJECT, not per key -- if two "free keys"
-share one project, rotating between them buys zero extra capacity. This
-class only rotates; it can't fix that upstream setup issue.
+Rate limits are per Google Cloud PROJECT, not per key -- if two of these
+keys share one project, having both in the cascade buys zero extra
+capacity. This class only rotates; it can't fix that upstream setup issue.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import List
 
 from src.utils.logger import Logger
 
@@ -27,11 +29,9 @@ def _next_pacific_midnight() -> datetime:
 
 class KeyManager:
 
-    def __init__(self, free_keys: List[str], paid_key: Optional[str]):
-        self.free_keys = free_keys
-        self.paid_key = paid_key
+    def __init__(self, keys: List[str]):
+        self.keys = [k for k in keys if k]
         self._exhausted_until = {}  # key -> utc datetime
-        self._cursor = 0
 
     def _is_exhausted(self, key: str) -> bool:
         until = self._exhausted_until.get(key)
@@ -44,33 +44,15 @@ class KeyManager:
 
     def mark_exhausted(self, key: str):
         self._exhausted_until[key] = _next_pacific_midnight()
-        label = "paid key" if key == self.paid_key else "free key"
-        Logger.warning(f"{label} exhausted (429) -- rotating.")
+        Logger.warning("API key exhausted (429) -- rotating to the next key in the cascade.")
 
-    def available_free_keys(self) -> List[str]:
-        return [k for k in self.free_keys if not self._is_exhausted(k)]
-
-    def sequence(self, force_paid: bool = False, paid_fallback: bool = True) -> List[str]:
-        """Ordered list of keys to try for one logical call."""
-        if force_paid:
-            if not self.paid_key:
-                raise RuntimeError("Stage requires the paid key (GEMINI_API_KEY_4) but none is set.")
-            return [self.paid_key]
-
-        available = self.available_free_keys()
-        # round-robin starting point so load spreads across keys instead of
-        # always hammering key #1 first
-        if available:
-            start = self._cursor % len(available)
-            ordered = available[start:] + available[:start]
-            self._cursor += 1
-        else:
-            ordered = []
-
-        if paid_fallback and self.paid_key:
-            ordered = ordered + [self.paid_key]
-
-        if not ordered:
-            raise RuntimeError("All free keys exhausted and no paid key (GEMINI_API_KEY_4) configured.")
-
-        return ordered
+    def sequence(self) -> List[str]:
+        """Fixed Key 1 -> Key 2 -> Key 4 cascade, skipping any key
+        currently marked exhausted from an earlier 429 today."""
+        available = [k for k in self.keys if not self._is_exhausted(k)]
+        if not available:
+            raise RuntimeError(
+                "All free-tier API keys exhausted for today "
+                "(GEMINI_API_KEY_1 / GEMINI_API_KEY_2 / GEMINI_API_KEY_4)."
+            )
+        return available

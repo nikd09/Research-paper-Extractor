@@ -11,7 +11,6 @@ from src.providers.base_provider import BaseProvider
 from src.providers.key_manager import KeyManager
 from src.utils.config import (
     FREE_API_KEYS,
-    PAID_API_KEY,
     STAGE_CONFIG,
     MAX_RETRIES,
     REQUEST_TIMEOUT,
@@ -29,22 +28,23 @@ class GeminiClient(BaseProvider):
     """
     Stage-aware Gemini client. Each call specifies which pipeline stage it
     belongs to ("extract" / "verify" / "verify_escalate" / "rag" /
-    "crosscheck"); STAGE_CONFIG resolves that to a model cascade and a key
-    pool.
+    "crosscheck"); STAGE_CONFIG resolves that to a model list (or model
+    cascade). Every stage draws from the same unified free-tier key
+    cascade (KeyManager) -- there is no separate paid-tier pool.
 
     Two config shapes are supported per stage:
-      - flat:    {"models": [...], "keys": [...], "paid_fallback": bool}
-      - cascade: {"cascade": [{"models": [...], "keys": [...]}, ...],
+      - flat:    {"models": [...], "thinking_level"/"thinking_budget": optional}
+      - cascade: {"cascade": [{"models": [...]}, ...],
                   "warn_on_model_fallback": bool}
-        Cascade steps are tried in order; a step is skipped entirely if its
-        key pool is empty (e.g. free keys all exhausted, or paid key unset).
+        Cascade steps are tried in order, each against the full key
+        cascade; a step only gets skipped if every key is exhausted.
 
     model_override / on_fallback are kept for GUI compatibility and only
     affect the "extract" stage's model cascade.
     """
 
     def __init__(self, model_override: Optional[str] = None, on_fallback=None, timeout_seconds: Optional[int] = None):
-        self.key_manager = KeyManager(FREE_API_KEYS, PAID_API_KEY)
+        self.key_manager = KeyManager(FREE_API_KEYS)
         self._clients = {}  # api_key -> genai.Client (cached)
         self.model_override = model_override
         self.on_fallback = on_fallback
@@ -60,8 +60,8 @@ class GeminiClient(BaseProvider):
         # actually served EVERY stage (not just "extract"), so
         # processing.models_used can report the full, real call history for
         # traceability and cost auditing -- e.g.
-        # {"extract": "gemini-3.6-flash", "verify": "gemini-3.1-pro-preview",
-        #  "crosscheck": "gemini-3.5-flash-lite", "escalation": "not_run"}
+        # {"extract": "gemini-3.6-flash", "verify": "gemini-3.6-flash",
+        #  "crosscheck": "gemini-3.5-flash-lite", "escalation": "gemini-3.7-flash"}
         self.model_call_log: dict = {}
 
     def _client_for(self, api_key: str) -> genai.Client:
@@ -105,11 +105,9 @@ class GeminiClient(BaseProvider):
             models = [self.model_override] + [m for m in models if m != self.model_override]
 
         thinking_level = cfg.get("thinking_level")
+        thinking_budget = cfg.get("thinking_budget")
 
-        key_sequence = self.key_manager.sequence(
-            force_paid=cfg.get("force_paid", False),
-            paid_fallback=cfg.get("paid_fallback", True),
-        )
+        key_sequence = self.key_manager.sequence()
 
         expected_model = self.active_model if stage == "extract" else None
         last_error = None
@@ -125,6 +123,7 @@ class GeminiClient(BaseProvider):
                         response = self._generate(
                             client, model, prompt, schema, file_path, images,
                             thinking_level=thinking_level,
+                            thinking_budget=thinking_budget,
                         )
 
                         if stage == "extract":
@@ -183,13 +182,14 @@ class GeminiClient(BaseProvider):
         warn_on_fallback: bool,
     ):
         """
-        Tries cascade steps in order. Each step pins a set of models to a
-        set of keys (e.g. flash-model -> free-keys, escalating to
-        pro-model -> paid-key only as a last step). A step is skipped if
-        its key pool resolves to empty -- in particular, if a step's keys
-        equal the free-key pool and all free keys are currently marked
-        exhausted, that step is skipped so the cascade falls through to the
-        next step.
+        Tries cascade steps (model lists) in order. Every step draws from
+        the same unified free-tier key cascade (KeyManager.sequence()) --
+        there is no separate key pool per step any more. The key cascade
+        is re-resolved at the START of each step (not once for the whole
+        cascade) so a key exhausted partway through an earlier step is
+        correctly excluded from later steps too. If every key is
+        exhausted, nothing later in the cascade can succeed either, so the
+        whole cascade stops rather than looping through remaining steps.
         """
         last_error = None
         first_model = None
@@ -199,17 +199,11 @@ class GeminiClient(BaseProvider):
                 break
 
         for step in cascade:
-            step_keys = [k for k in step["keys"] if k]
-            if not step_keys:
-                continue  # e.g. paid key not configured
-
-            is_free_pool = step_keys == self.key_manager.free_keys
-            if is_free_pool:
-                key_seq = self.key_manager.available_free_keys()
-                if not key_seq:
-                    continue  # all free keys exhausted -> fall through to next step
-            else:
-                key_seq = step_keys
+            try:
+                key_seq = self.key_manager.sequence()
+            except RuntimeError as e:
+                last_error = e
+                break
 
             for model in step["models"]:
                 for api_key in key_seq:
@@ -237,8 +231,7 @@ class GeminiClient(BaseProvider):
                             # to the next model/step.
                             last_error = e
                             if isinstance(e, (ServerError, ClientError)) and _is_rate_limit_error(e):
-                                if is_free_pool:
-                                    self.key_manager.mark_exhausted(api_key)
+                                self.key_manager.mark_exhausted(api_key)
                                 break  # stop retrying this model on this key
                             Logger.warning(f"[{stage}] {model} failed: {e}")
                             if attempt < MAX_RETRIES - 1:
@@ -260,6 +253,7 @@ class GeminiClient(BaseProvider):
         file_path: Optional[str],
         images: Optional[List[bytes]] = None,
         thinking_level: Optional[str] = None,
+        thinking_budget: Optional[int] = None,
     ):
         contents = [prompt]
 
@@ -273,13 +267,19 @@ class GeminiClient(BaseProvider):
             ]
             contents = image_parts + contents
 
-        # thinking_level is None for every existing stage -- only
-        # verify_escalate (STAGE_CONFIG in config.py) sets it, and that
-        # stage's model list is exclusively the Pro escalation model, so
-        # this never reaches a Flash-tier call.
-        thinking_config = (
-            types.ThinkingConfig(thinking_level=thinking_level) if thinking_level else None
-        )
+        # Both None for every stage except whichever ones set them in
+        # STAGE_CONFIG (verify_escalate, synthesis "pro") -- those are the
+        # only calls asking for deeper chain-of-thought reasoning instead
+        # of a stronger model tier. thinking_budget is an explicit token
+        # count; thinking_level is a coarser named tier -- a caller sets
+        # at most one, but if both were somehow set, ThinkingConfig
+        # accepts both kwargs and lets the API resolve precedence.
+        thinking_kwargs = {}
+        if thinking_level:
+            thinking_kwargs["thinking_level"] = thinking_level
+        if thinking_budget:
+            thinking_kwargs["thinking_budget"] = thinking_budget
+        thinking_config = types.ThinkingConfig(**thinking_kwargs) if thinking_kwargs else None
 
         if schema:
             response = client.models.generate_content(

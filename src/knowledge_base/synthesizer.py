@@ -50,22 +50,17 @@ class Synthesizer:
         self.json_dir = Path(output_dir) / "json"
         self.kb_dir = Path(kb_dir)
 
-        # Same free-key-first / force-paid pattern as every other stage --
-        # "flash" behaves like extract/rag (free keys first, paid fallback),
-        # "pro" behaves like verify_escalate (force paid, it's the
-        # expensive-but-capable tier).
+        # Same unified free-tier key cascade as every other stage now --
+        # "pro" behaves like verify_escalate (high thinking budget for
+        # deeper reasoning instead of a stronger/paid model tier).
         if model_key == "pro":
             cfg.STAGE_CONFIG["synthesis"] = {
                 "models": [self.model_name],
-                "keys": [],
-                "paid_fallback": True,
-                "force_paid": True,
+                "thinking_budget": 4096,
             }
         else:
             cfg.STAGE_CONFIG["synthesis"] = {
                 "models": [self.model_name],
-                "keys": cfg.FREE_API_KEYS,
-                "paid_fallback": True,
             }
 
         self.provider = GeminiClient()

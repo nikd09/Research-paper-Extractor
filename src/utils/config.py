@@ -6,25 +6,26 @@ load_dotenv()
 # ==========================
 # API Keys
 # ==========================
-# Free-tier-first policy: FREE_API_KEYS are tried in order (each ideally its
-# own Google Cloud project -- rate limits are per-project, not per-key, so
-# keys sharing a project do NOT add capacity). PAID_API_KEY (Tier 1) is the
-# true last resort: used only once every free key is exhausted for a stage,
-# OR for the dedicated escalation stage below.
+# Unified free-tier-only cascade: GEMINI_API_KEY_1 -> _2 -> _4, tried in
+# that fixed order for every stage uniformly (each ideally its own Google
+# Cloud project -- rate limits are per-project, not per-key, so keys
+# sharing a project do NOT add capacity). There is no separate "paid"
+# pool any more -- key #4 used to be held back as a forced-paid last
+# resort; it's now just the third key in the same free-tier cascade.
+# ESCALATION_MODEL below is a Flash-tier model with a high thinking
+# budget instead of a Pro-tier model, so nothing in this pipeline
+# deliberately reaches for a paid model any more.
 #
-# Key #3 removed (deactivated) -- only 1 and 2 are free-tier now. Nothing
-# else needs to change: FREE_API_KEYS below filters out any unset key
-# automatically, so a missing/blank GEMINI_API_KEY_3 just means the pool
-# has 2 entries instead of 3.
+# Key #3 removed (deactivated). FREE_API_KEYS below filters out any unset
+# key automatically, so a missing/blank key just means a shorter cascade.
 
 FREE_API_KEYS = [
     k for k in [
         os.getenv("GEMINI_API_KEY_1"),
         os.getenv("GEMINI_API_KEY_2"),
+        os.getenv("GEMINI_API_KEY_4"),
     ] if k
 ]
-
-PAID_API_KEY = os.getenv("GEMINI_API_KEY_4")
 
 # Backward compat: if someone still only sets GEMINI_API_KEY, treat it as
 # free key #1 so older .env files keep working.
@@ -41,35 +42,35 @@ EXTRACT_MODELS = [
     "models/gemini-3.5-flash",
 ]
 
-# Verify tries Flash on free keys #1/#2 FIRST, then Flash on the paid key
-# if both free keys are exhausted. Pro does NOT run here by default -- it's
-# reserved for the automatic escalation stage below (only the specific
-# values still flagged after everything else, near-zero cost on clean
-# papers).
+# Verify tries Flash 3.6 then 3.5, on whichever key the unified cascade
+# hands it (see KeyManager.sequence()). Escalation does NOT run here by
+# default -- it's reserved for the automatic escalation stage below (only
+# the specific values still flagged after everything else, near-zero
+# quota use on clean papers).
 #
-# MANUAL_PRO_VERIFY: flip to True if you've looked at a paper's results and
-# Flash isn't cutting it -- this adds a full-paper Pro verification pass
-# (not just flagged residuals) after the two Flash steps, on the paid key.
-# Flash on free keys is always tried first regardless of this setting; this
-# only controls whether Pro gets a full unconditional pass on top.
+# MANUAL_PRO_VERIFY: flip to True if you've looked at a paper's results
+# and Flash isn't cutting it -- this adds a full-paper high-thinking pass
+# (not just flagged residuals) after the two Flash steps. Flash is always
+# tried first regardless of this setting; this only controls whether the
+# escalation-tier model gets a full unconditional pass on top.
 MANUAL_PRO_VERIFY = False
 
 VERIFY_CASCADE = [
-    {"models": ["models/gemini-3.6-flash", "models/gemini-3.5-flash"], "keys": FREE_API_KEYS},
-    {"models": ["models/gemini-3.6-flash", "models/gemini-3.5-flash"], "keys": [PAID_API_KEY] if PAID_API_KEY else []},
+    {"models": ["models/gemini-3.6-flash", "models/gemini-3.5-flash"]},
 ]
 
 # Last-resort escalation ONLY -- called for the specific claims still
 # flagged [unverified]/[crosscheck] after the free-tier verify + crosscheck
 # passes. Real last resort: papers with nothing flagged never reach this,
-# so cost stays near zero for well-behaved extractions. Swap this one line
-# any time to re-test with a cheaper model instead of Pro.
-ESCALATION_MODEL = "models/gemini-3.1-pro-preview"
+# so quota use stays near zero for well-behaved extractions. Flash-tier
+# model with a high thinking budget (see STAGE_CONFIG below) rather than
+# a Pro-tier model -- this stage no longer deliberately reaches for a
+# paid model. Swap this one line any time to re-test with a different
+# model.
+ESCALATION_MODEL = "models/gemini-3.7-flash"
 
 if MANUAL_PRO_VERIFY:
-    VERIFY_CASCADE.append(
-        {"models": [ESCALATION_MODEL], "keys": [PAID_API_KEY] if PAID_API_KEY else []}
-    )
+    VERIFY_CASCADE.append({"models": [ESCALATION_MODEL]})
 
 RAG_MODELS = [
     "models/gemini-3.6-flash",
@@ -93,26 +94,27 @@ CROSSCHECK_MODELS = [
 # it was to A/B compare flash vs pro on the same input and decide for
 # real rather than assume.
 #
-# synthesize.py's --model flag picks one of these two keys.
+# synthesize.py's --model flag picks one of these two keys. Both are
+# Flash-tier now -- "pro" gets a high thinking budget (see
+# Synthesizer.__init__) for deeper reasoning instead of a stronger model.
 SYNTHESIS_MODEL_OPTIONS = {
     "flash": "models/gemini-3.6-flash",
-    "pro": "models/gemini-3.1-pro-preview",
+    "pro": "models/gemini-3.7-flash",
 }
 
 STAGE_CONFIG = {
-    "extract":         {"models": EXTRACT_MODELS,     "keys": FREE_API_KEYS, "paid_fallback": True},
+    "extract":         {"models": EXTRACT_MODELS},
     "verify":          {"cascade": VERIFY_CASCADE, "warn_on_model_fallback": False},
-    # thinking_level="medium" only applies here -- ESCALATION_MODEL is the
-    # sole model in this stage's list (gemini-3.1-pro-preview), so this can
-    # never reach a Flash-tier call. See GeminiClient._generate().
-    "verify_escalate": {"models": [ESCALATION_MODEL], "keys": [], "paid_fallback": True, "force_paid": True, "thinking_level": "medium"},
-    "rag":             {"models": RAG_MODELS,         "keys": FREE_API_KEYS, "paid_fallback": True},
-    "crosscheck":       {"models": CROSSCHECK_MODELS,  "keys": FREE_API_KEYS, "paid_fallback": True},
-    # "synthesis" stage config is built dynamically in synthesize.py from
+    # thinking_budget=2048 gives this stage deep chain-of-thought reasoning
+    # over contested MetricValue records without needing a Pro-tier model.
+    # See GeminiClient._generate().
+    "verify_escalate": {"models": [ESCALATION_MODEL], "thinking_budget": 2048},
+    "rag":             {"models": RAG_MODELS},
+    "crosscheck":      {"models": CROSSCHECK_MODELS},
+    # "synthesis" stage config is built dynamically in synthesizer.py from
     # SYNTHESIS_MODEL_OPTIONS + the chosen --model flag, since it needs a
-    # single model, not a cascade, and the free/paid key routing depends
-    # on which of the two options was picked (flash -> free-first, pro ->
-    # force paid, same pattern as every other stage above).
+    # single model, not a cascade, and "pro" additionally sets a high
+    # thinking_budget (same idea as verify_escalate above).
 }
 # Kept for anything still importing the old flat list (e.g. tests).
 PREFERRED_MODELS = EXTRACT_MODELS
