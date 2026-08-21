@@ -49,14 +49,21 @@ class PipelineAPI:
     """Exposed to the frontend as `pywebview.api.<method>`."""
 
     def __init__(self):
-        self.window = None
+        self._window = None
         self._running = False
         self._cancel_requested = False
         self._synthesis_running = False
         self.current_input_dir = DEFAULT_INPUT_DIR
 
     def set_window(self, window):
-        self.window = window
+        # Kept private (leading underscore) so pywebview's own JS-bridge
+        # auto-discovery (inject_pywebview() in webview/util.py, which
+        # walks every public, non-callable attribute of this class via
+        # dir()) never recurses into the live Window/native WinForms
+        # object -- it used to, spamming the console with COM/UI-thread
+        # errors from blindly probing hundreds of unrelated .NET
+        # properties on window.native.
+        self._window = window
 
     # ------------------------------------------------------------------
     # Settings (remembers last-used folders/model between launches)
@@ -127,7 +134,7 @@ class PipelineAPI:
 
     def browse_folder(self, current_path=""):
         start_dir = current_path if current_path and Path(current_path).exists() else str(Path.cwd())
-        result = self.window.create_file_dialog(webview.FOLDER_DIALOG, directory=start_dir)
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG, directory=start_dir)
         if result:
             return result[0]
         return None
@@ -188,10 +195,10 @@ class PipelineAPI:
     # ------------------------------------------------------------------
 
     def _push(self, event, payload):
-        if not self.window:
+        if not self._window:
             return
         try:
-            self.window.evaluate_js(
+            self._window.evaluate_js(
                 f"window.onPipelineEvent({json.dumps(event)}, {json.dumps(payload)})"
             )
         except Exception:
@@ -311,7 +318,7 @@ class PipelineAPI:
 
         """Native multi-file picker, as an alternative to drag-drop."""
 
-        result = self.window.create_file_dialog(
+        result = self._window.create_file_dialog(
 
             webview.OPEN_DIALOG,
 
