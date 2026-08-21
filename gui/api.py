@@ -513,5 +513,20 @@ def main():
     )
     api.set_window(window)
 
-    webview.start()
+    # Confirmed bug in pywebview 6.2.1 itself (webview/platforms/winforms.py,
+    # init_storage()): with the default private_mode=True and no storage_path,
+    # the WebView2 profile directory is created via the throwaway expression
+    # `tempfile.TemporaryDirectory().name` -- nothing keeps a reference to
+    # that TemporaryDirectory object, so CPython's refcounting GC can finalize
+    # it (deleting the directory it just created) before or while WebView2 is
+    # still initializing into it. That race is what produces "CoreWebView2
+    # can only be accessed from the UI thread" / E_NOINTERFACE / "maximum
+    # recursion depth exceeded" on later launches. Passing an explicit
+    # storage_path routes init_storage() through its other branch instead: a
+    # real, persistent directory created with os.makedirs, no throwaway
+    # object to race against.
+    webview_cache_dir = Path(__file__).parent / ".webview_cache"
+    webview_cache_dir.mkdir(exist_ok=True)
+
+    webview.start(storage_path=str(webview_cache_dir))
 
