@@ -513,5 +513,5 @@ def main():
     )
     api.set_window(window)
 
-    webview.start(window)
+    webview.start()
 
