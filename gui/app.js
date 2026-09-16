@@ -29,6 +29,20 @@ const el = {
   openBriefBtn: document.getElementById("openBriefBtn"),
   themeToggle: document.getElementById("themeToggle"),
   themeIcon: document.getElementById("themeIcon"),
+  packSelect: document.getElementById("packSelect"),
+  packApplicationNote: document.getElementById("packApplicationNote"),
+  packIdInput: document.getElementById("packIdInput"),
+  packNameInput: document.getElementById("packNameInput"),
+  packApplicationInput: document.getElementById("packApplicationInput"),
+  packMetricsInput: document.getElementById("packMetricsInput"),
+  packRelevanceInput: document.getElementById("packRelevanceInput"),
+  packComplianceModeSelect: document.getElementById("packComplianceModeSelect"),
+  packComplianceTextInput: document.getElementById("packComplianceTextInput"),
+  packEnvelopeInput: document.getElementById("packEnvelopeInput"),
+  newPackBtn: document.getElementById("newPackBtn"),
+  savePackBtn: document.getElementById("savePackBtn"),
+  activatePackBtn: document.getElementById("activatePackBtn"),
+  packSaveNote: document.getElementById("packSaveNote"),
 };
 
 let lastMarkdownPath = null;
@@ -325,6 +339,91 @@ el.openBriefBtn.addEventListener("click", () => {
   if (lastMarkdownPath) pywebview.api.open_folder(lastMarkdownPath);
 });
 
+// ---------------- Research Topic (domain packs) ----------------
+// See src/packs/ -- which metrics get extracted, what counts as
+// "relevant," and what the PFAS/fluoropolymer flag means for this run.
+
+let packsCache = [];
+
+async function refreshPackList(selectId) {
+  const { packs, active_id } = await pywebview.api.list_packs();
+  packsCache = packs;
+  el.packSelect.innerHTML = packs
+    .map((p) => `<option value="${p.id}">${p.name}</option>`)
+    .join("");
+  el.packSelect.value = selectId || active_id;
+  await loadPackIntoForm(el.packSelect.value);
+}
+
+async function loadPackIntoForm(packId) {
+  const pack = await pywebview.api.get_pack(packId);
+  el.packIdInput.value = pack.id;
+  el.packNameInput.value = pack.name;
+  el.packApplicationInput.value = pack.application;
+  el.packMetricsInput.value = pack.metrics.join(", ");
+  el.packRelevanceInput.value = pack.relevance_targets.join(", ");
+  el.packComplianceModeSelect.value = pack.compliance.mode;
+  el.packComplianceTextInput.value = pack.compliance.prompt_text;
+  el.packEnvelopeInput.value = pack.envelope;
+
+  const short = pack.application.length > 140 ? pack.application.slice(0, 140) + "..." : pack.application;
+  el.packApplicationNote.textContent = short;
+}
+
+el.packSelect.addEventListener("change", () => loadPackIntoForm(el.packSelect.value));
+
+el.newPackBtn.addEventListener("click", () => {
+  el.packIdInput.value = "";
+  el.packNameInput.value = "";
+  el.packApplicationInput.value = "";
+  el.packMetricsInput.value = "";
+  el.packRelevanceInput.value = "";
+  el.packComplianceModeSelect.value = "note";
+  el.packComplianceTextInput.value = "";
+  el.packEnvelopeInput.value = "";
+  el.packSaveNote.className = "pack-note";
+  el.packSaveNote.textContent = "Fill in a topic id and the fields above, then Save.";
+});
+
+el.savePackBtn.addEventListener("click", async () => {
+  const packId = el.packIdInput.value.trim();
+  if (!packId) {
+    el.packSaveNote.className = "pack-note warn";
+    el.packSaveNote.textContent = "A topic id is required (short, no spaces -- e.g. pfas-corrosion).";
+    return;
+  }
+  const result = await pywebview.api.save_pack({
+    id: packId,
+    name: el.packNameInput.value,
+    application: el.packApplicationInput.value,
+    metrics: el.packMetricsInput.value,
+    relevance_targets: el.packRelevanceInput.value,
+    compliance: {
+      mode: el.packComplianceModeSelect.value,
+      prompt_text: el.packComplianceTextInput.value,
+    },
+    envelope: el.packEnvelopeInput.value,
+  });
+  if (result.error) {
+    el.packSaveNote.className = "pack-note warn";
+    el.packSaveNote.textContent = "Couldn't save: " + result.error;
+    return;
+  }
+  el.packSaveNote.className = "pack-note ok";
+  el.packSaveNote.textContent = `Saved "${packId}". Use "Make Active" to switch to it.`;
+  await refreshPackList(packId);
+});
+
+el.activatePackBtn.addEventListener("click", async () => {
+  const packId = el.packIdInput.value.trim() || el.packSelect.value;
+  await pywebview.api.set_active_pack(packId);
+  el.packSaveNote.className = "pack-note warn";
+  el.packSaveNote.textContent =
+    `"${packId}" is now active. The Knowledge Base step already uses it. ` +
+    `Restart the app before running the main pipeline so it fully switches over too.`;
+  await refreshPackList(packId);
+});
+
 el.startBtn.addEventListener("click", async () => {
   await persistSettings();
   el.console.innerHTML = "";
@@ -371,6 +470,8 @@ window.addEventListener("pywebviewready", async () => {
     .join("");
   el.synthModelSelect.value = settings.synthesis_model || synthModels[0].key;
   el.envelopeInput.value = settings.envelope || "";
+
+  await refreshPackList();
 
   setStatus("", "Idle");
   log("Ready. Scanning folders...", "hd");

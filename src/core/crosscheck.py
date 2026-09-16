@@ -27,14 +27,12 @@ from schemas.paper_schema import MetricValue
 from src.core.validator import _normalize, _numbers_in
 from src.utils.logger import Logger
 
-_FIELDS = [
-    "friction_coefficients",
-    "wear_rates",
-    "mechanical_properties",
-    "loads",
-    "temperatures",
-    "sliding_speeds",
-]
+# Pack-controlled (see src/packs/) instead of a fixed list -- this used to
+# be a second hand-typed copy of the same six names in validator.py,
+# which was a real duplication risk: add a metric to one file and forget
+# this one, and crosscheck silently stops covering it.
+from src.packs.loader import PackLoader
+_FIELDS = PackLoader.get_active().metrics
 
 
 def _numbers_of(mv: MetricValue) -> set:

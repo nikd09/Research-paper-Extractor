@@ -290,6 +290,16 @@ select {
   min-height: 14px;
 }
 
+.pack-note {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.pack-note.warn { color: #c97a3a; }
+.pack-note.ok { color: var(--accent); }
+
 /* ---------------- Stats ---------------- */
 
 .stats {

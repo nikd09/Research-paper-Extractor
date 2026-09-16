@@ -26,6 +26,8 @@ from src.utils.config import (
 from src.utils.logger import Logger
 from src.utils.paper_id import PaperID
 from src.utils.file_utils import FileUtils
+from src.packs.loader import PackLoader
+from src.packs.output_guard import check_output_folder, stamp_output_folder
 from pathlib import Path
 
 class Pipeline:
@@ -46,6 +48,14 @@ class Pipeline:
         the start of every pipeline stage. Optional -- CLI usage (tests/
         test_pipeline.py) works unchanged without passing one.
         """
+
+        # Phase 4 safety net: refuse to write this pack's results into a
+        # folder that already holds a DIFFERENT pack's results, so two
+        # research focuses never silently end up mixed in one knowledge
+        # base. See src/packs/output_guard.py.
+        active_pack = PackLoader.get_active()
+        check_output_folder(output_dir, active_pack)
+        stamp_output_folder(output_dir, active_pack)
 
         step_counter = {"n": 0}
 
@@ -206,6 +216,8 @@ Engineering Knowledge
         )
 
         analysis.processing.source_file = document.filename
+
+        analysis.processing.pack_id = active_pack.id
 
         analysis.processing.pipeline_version = "3.0"
 

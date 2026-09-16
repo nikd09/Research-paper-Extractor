@@ -18,14 +18,11 @@ from typing import Dict, List, Tuple
 from schemas.paper_schema import MetricValue
 from src.utils.logger import Logger
 
-_FIELDS = [
-    "friction_coefficients",
-    "wear_rates",
-    "mechanical_properties",
-    "loads",
-    "temperatures",
-    "sliding_speeds",
-]
+# Pack-controlled (see src/packs/) instead of a fixed list -- same
+# duplication risk as crosscheck.py had; both now read the same single
+# source of truth instead of carrying their own hand-typed copy.
+from src.packs.loader import PackLoader
+_FIELDS = PackLoader.get_active().metrics
 
 _FLAG_STATES = {"unverified", "crosscheck_mismatch"}
 

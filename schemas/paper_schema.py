@@ -26,6 +26,14 @@ class Processing(BaseModel):
 
     source_file: str = ""
 
+    # Which pack (research focus) produced this record -- e.g.
+    # "seat-recliner" or "pfas-corrosion" (see src/packs/). Stamped by
+    # Pipeline.run() the same way paper_id/source_file are, never left
+    # for the model to fill in. Exists so an output folder that
+    # accidentally ends up holding two different packs' results is
+    # detectable after the fact, not just prevented up front.
+    pack_id: str = ""
+
     model: str = ""
 
     pipeline_version: str = "3.0"
@@ -204,22 +212,23 @@ class MetricValue(BaseModel):
     confidence: str = "unverified"
 
 
-class PerformanceMetrics(BaseModel):
-    friction_coefficients: List[MetricValue] = Field(default_factory=list)
-    wear_rates: List[MetricValue] = Field(default_factory=list)
+# PerformanceMetrics used to be a fixed class here -- six tribology-
+# specific fields (friction_coefficients, wear_rates, ...) typed directly
+# into the schema. It's now built dynamically from the active pack's
+# `metrics` list (see src/packs/schema_builder.py and packs/*/pack.json),
+# so a different research focus (e.g. corrosion of PFAS materials instead
+# of tribology) gets its own field names -- corrosion_rates,
+# pitting_potentials, etc. -- without editing this file. The record shape
+# each field holds (List[MetricValue]) is unchanged; only which buckets
+# exist is pack-controlled. Which pack is active is resolved once, at
+# import time (see src/packs/loader.py's docstring for why that's a
+# deliberate simplification, not an oversight).
+from src.packs.loader import PackLoader as _PackLoader
+from src.packs.schema_builder import (
+    build_performance_metrics_model as _build_performance_metrics_model,
+)
 
-    # Renamed from `hardness_values`. Papers in this domain very often
-    # report compressive/tensile yield or offset-yield strength, NOT
-    # hardness (Rockwell/Brinell/Shore) -- storing yield-strength data
-    # under a field literally named "hardness_values" was a confirmed
-    # mislabeling bug. This field covers yield strength, offset yield
-    # strength, modulus, hardness, or any other single-number mechanical
-    # property; `unit` on each MetricValue disambiguates which.
-    mechanical_properties: List[MetricValue] = Field(default_factory=list)
-
-    loads: List[MetricValue] = Field(default_factory=list)
-    temperatures: List[MetricValue] = Field(default_factory=list)
-    sliding_speeds: List[MetricValue] = Field(default_factory=list)
+PerformanceMetrics = _build_performance_metrics_model(_PackLoader.get_active())
 
 
 # ---------- RELEVANCE ----------
@@ -249,9 +258,15 @@ class RelevanceNote(BaseModel):
     note: str = "Not Reported"
 
 
-class Relevance(BaseModel):
-    automotive_relevance: RelevanceNote = Field(default_factory=RelevanceNote)
-    seat_recliner_relevance: RelevanceNote = Field(default_factory=RelevanceNote)
+# Same pack-driven approach as PerformanceMetrics above: which relevance
+# targets exist (automotive_relevance/seat_recliner_relevance today,
+# something like corrosion_relevance for a different pack) comes from
+# packs/*/pack.json's `relevance_targets` list, not a fixed class here.
+from src.packs.schema_builder import (
+    build_relevance_model as _build_relevance_model,
+)
+
+Relevance = _build_relevance_model(_PackLoader.get_active())
 
 
 # ---------- INDUSTRIAL INSIGHTS ----------
