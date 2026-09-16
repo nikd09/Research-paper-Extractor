@@ -100,7 +100,13 @@ class Synthesizer:
         if not self.requirements_dir.exists():
             return ""
 
-        pdfs = sorted(self.requirements_dir.glob("*.pdf"))
+        # Newest-modified last, not alphabetical -- so when multiple
+        # requirement documents exist (a market case, a spec sheet, a
+        # later project brief that updates both), the most recently
+        # added one reads last and is freshest in the model's context,
+        # and the instruction below tells it explicitly what to do if
+        # they disagree rather than leaving that to chance.
+        pdfs = sorted(self.requirements_dir.glob("*.pdf"), key=lambda p: p.stat().st_mtime)
         if not pdfs:
             return ""
 
@@ -157,7 +163,16 @@ class Synthesizer:
             f"""AUTHORITATIVE PROJECT REQUIREMENTS (real spec/market-case
 documents -- this is the actual, current source of truth for the target
 application; the operating envelope note below is supplementary framing
-only and must NOT override anything stated here):
+only and must NOT override anything stated here). There may be more than
+one document below (e.g. an early market case alongside a later, more
+specific project brief) -- they are expected to mostly agree and often
+cover different ground (one may have competitor benchmark data the other
+doesn't, for instance). If two documents state a genuinely different
+number for the SAME requirement, prefer whichever document is more
+specific/recent about that exact target (a dated project brief with an
+explicit target over an earlier interview note, for example) and say so
+plainly in `gaps` -- do not silently average the two numbers or pick one
+without saying you did:
 {requirements_text}
 
 """

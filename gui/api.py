@@ -67,12 +67,22 @@ class PipelineAPI:
     # ------------------------------------------------------------------
 
     def load_settings(self):
+        # NOTE on "envelope": deliberately NOT cached blindly. If the
+        # active pack's envelope text gets improved later (e.g. a
+        # corrected requirement), a settings file holding an old copy
+        # would silently keep showing the stale text forever -- exactly
+        # what happened here once already. So a saved settings file only
+        # carries an "envelope" key when the user genuinely typed
+        # something different from the pack's own default (see
+        # save_settings below); otherwise this always reads the pack's
+        # current envelope live.
+        current_pack_envelope = PackLoader.get_active().envelope
         if SETTINGS_FILE.exists():
             try:
                 settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
                 self.current_input_dir = settings.get("input_dir", DEFAULT_INPUT_DIR)
                 settings.setdefault("synthesis_model", "flash")
-                settings.setdefault("envelope", DEFAULT_ENVELOPE)
+                settings.setdefault("envelope", current_pack_envelope)
                 return settings
             except Exception:
                 pass
@@ -82,7 +92,7 @@ class PipelineAPI:
             "output_dir": DEFAULT_OUTPUT_DIR,
             "model": PREFERRED_MODELS[0],
             "synthesis_model": "flash",
-            "envelope": DEFAULT_ENVELOPE,
+            "envelope": current_pack_envelope,
         }
 
     def save_settings(self, input_dir, output_dir, model, synthesis_model=None, envelope=None):
@@ -96,19 +106,23 @@ class PipelineAPI:
                 existing = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
             except Exception:
                 pass
-        SETTINGS_FILE.write_text(
-            json.dumps(
-                {
-                    "input_dir": input_dir,
-                    "output_dir": output_dir,
-                    "model": model,
-                    "synthesis_model": synthesis_model if synthesis_model is not None else existing.get("synthesis_model", "flash"),
-                    "envelope": envelope if envelope is not None else existing.get("envelope", DEFAULT_ENVELOPE),
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
+
+        current_pack_envelope = PackLoader.get_active().envelope
+        resolved_envelope = envelope if envelope is not None else existing.get("envelope")
+        # Only persist "envelope" as a real key when it's an actual
+        # override of the pack's own text -- otherwise omit it entirely
+        # so future loads always pick up the pack's live default instead
+        # of a frozen copy from whenever this was last saved.
+        settings_out = {
+            "input_dir": input_dir,
+            "output_dir": output_dir,
+            "model": model,
+            "synthesis_model": synthesis_model if synthesis_model is not None else existing.get("synthesis_model", "flash"),
+        }
+        if resolved_envelope is not None and resolved_envelope != current_pack_envelope:
+            settings_out["envelope"] = resolved_envelope
+
+        SETTINGS_FILE.write_text(json.dumps(settings_out, indent=2), encoding="utf-8")
         return {"ok": True}
 
     # ------------------------------------------------------------
