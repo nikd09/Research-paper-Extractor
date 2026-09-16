@@ -1,0 +1,23 @@
+{
+  "id": "pfas-corrosion",
+  "name": "PFAS material corrosion behaviour",
+  "application": "DRAFT -- first-pass pack, written as a starting point for review, not a finished spec. Investigates corrosion/degradation behaviour of PFAS-containing materials and coatings (e.g. PTFE, PVDF, FEP) versus PFAS-free alternatives, under realistic service exposure (humidity, salt spray, temperature cycling). Edit this paragraph to describe the real target application before relying on it.",
+  "metrics": [
+    "corrosion_rates",
+    "pitting_potentials",
+    "mass_loss",
+    "coating_adhesion",
+    "impedance_values",
+    "mechanical_properties"
+  ],
+  "relevance_targets": [
+    "corrosion_relevance"
+  ],
+  "compliance": {
+    "mode": "include",
+    "prompt_text": "This pack studies PFAS/fluoropolymer materials directly -- do NOT exclude a material from `ranked_materials` because `contains_fluoropolymer_or_pfas=true`. Instead, use that flag to clearly LABEL every ranked material as PFAS-containing or PFAS-free (set `pfas_free_compliant=\"no\"` for flagged materials, `\"yes\"` for materials with no flagged entries, `\"unclear\"` if the underlying data doesn't specify), so a reader can directly compare corrosion performance across both groups. A PFAS-containing material with strong corrosion data should still be ranked and discussed -- it may be the benchmark a PFAS-free alternative is being measured against."
+  },
+  "envelope": "DRAFT -- edit before relying on this. Placeholder operating envelope: a sliding/structural component exposed to humid or salt-spray automotive-adjacent service conditions, ambient-to-moderate temperature cycling, multi-year service life, where corrosion resistance and long-term coating/material integrity matter alongside (not instead of) the tribological performance already tracked by the seat-recliner pack. Replace with the real exposure conditions, standard/test method, and pass/fail criteria for this investigation.",
+  "requirements_dir": "docs/requirements-pfas-corrosion",
+  "output_dir": "outputs_pfas-corrosion"
+}

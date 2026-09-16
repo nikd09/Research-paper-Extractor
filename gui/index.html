@@ -85,6 +85,60 @@
         <div class="divider"></div>
 
         <div class="field">
+          <label>Research Topic <span class="info-badge" title="Which research focus the pipeline is configured for -- what it extracts from each paper, and what counts as relevant. Switching this here takes effect for the Knowledge Base step immediately; the per-paper extraction step needs a restart to fully switch over.">i</span></label>
+          <select id="packSelect"></select>
+          <div class="pack-note" id="packApplicationNote"></div>
+        </div>
+
+        <details class="advanced-toggle">
+          <summary>Advanced: view / edit this topic</summary>
+          <div class="field">
+            <label>Topic id (short, no spaces)</label>
+            <input type="text" id="packIdInput" placeholder="e.g. pfas-corrosion" />
+          </div>
+          <div class="field">
+            <label>Display name</label>
+            <input type="text" id="packNameInput" />
+          </div>
+          <div class="field">
+            <label>Application / research question</label>
+            <textarea id="packApplicationInput" rows="3"></textarea>
+          </div>
+          <div class="field">
+            <label>Metrics to extract from each paper (comma-separated)</label>
+            <textarea id="packMetricsInput" rows="2"></textarea>
+          </div>
+          <div class="field">
+            <label>Relevance fields (comma-separated, first one decides what counts as "relevant")</label>
+            <input type="text" id="packRelevanceInput" />
+          </div>
+          <div class="field">
+            <label>PFAS/fluoropolymer flag: what should it mean here?</label>
+            <select id="packComplianceModeSelect">
+              <option value="exclude">Exclude flagged materials (PFAS-free is a requirement)</option>
+              <option value="include">Include and label flagged materials (PFAS is what we're studying)</option>
+              <option value="note">Just label it, no ranking effect</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Compliance rule wording (sent to the model as-is)</label>
+            <textarea id="packComplianceTextInput" rows="3"></textarea>
+          </div>
+          <div class="field">
+            <label>Default operating envelope</label>
+            <textarea id="packEnvelopeInput" rows="4"></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn btn-ghost" id="newPackBtn">New Topic</button>
+            <button class="btn btn-primary" id="savePackBtn">Save Topic</button>
+            <button class="btn btn-ghost" id="activatePackBtn">Make Active</button>
+          </div>
+          <div class="pack-note" id="packSaveNote"></div>
+        </details>
+
+        <div class="divider"></div>
+
+        <div class="field">
           <label>Knowledge Base <span class="info-badge" title="Cross-paper reasoning over everything already processed -- ranks materials, flags contradictions and gaps for your target application.">i</span></label>
           <select id="synthModelSelect"></select>
         </div>

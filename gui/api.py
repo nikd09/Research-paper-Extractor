@@ -29,20 +29,17 @@ from src.utils.file_utils import FileUtils
 from src.utils.output_checker import OutputChecker
 from src.utils.config import PREFERRED_MODELS, SYNTHESIS_MODEL_OPTIONS
 from src.knowledge_base.synthesizer import Synthesizer
+from src.packs.loader import PackLoader
+from src.packs.pack import Pack, ComplianceRule
+from src.packs.output_guard import check_output_folder
 
 SETTINGS_FILE = Path(__file__).parent / "gui_settings.json"
 DEFAULT_INPUT_DIR = "papers/input"
 DEFAULT_OUTPUT_DIR = "outputs"
-DEFAULT_ENVELOPE = (
-    "Automotive seat recliner pivot/bushing mechanism: low sliding speed "
-    "(oscillatory, not continuous rotation), boundary-lubricated or dry "
-    "sliding, light-to-moderate contact pressure, indoor cabin temperature "
-    "range (roughly -20C to 80C), multi-year maintenance-free service life, "
-    "priority on low friction (avoid squeak/stick-slip), low wear, and no "
-    "grease contamination of upholstery. Static friction / stiction "
-    "(stick-slip onset) matters as much as steady-state dynamic friction, "
-    "since that transition is the primary driver of audible squeak."
-)
+# Used to be typed out here AND in synthesize.py -- the two copies had
+# quietly drifted apart. Both now read the same active pack's envelope
+# (packs/<id>/pack.json) instead. See src/packs/.
+DEFAULT_ENVELOPE = PackLoader.get_active().envelope
 
 
 class PipelineAPI:
@@ -113,6 +110,82 @@ class PipelineAPI:
             encoding="utf-8",
         )
         return {"ok": True}
+
+    # ------------------------------------------------------------
+    # Domain packs -- which research focus (metrics, relevance targets,
+    # compliance rule, envelope) the pipeline is currently configured
+    # for. See src/packs/. This is the in-app "Topic" screen backend.
+    # ------------------------------------------------------------
+
+    def list_packs(self):
+        """Every pack found under packs/*/pack.json, plus which one is
+        currently active -- for populating the Topic dropdown."""
+        packs = PackLoader.list_available()
+        active_id = PackLoader.get_active_id()
+        return {
+            "packs": [
+                {"id": p.id, "name": p.name, "application": p.application}
+                for p in packs
+            ],
+            "active_id": active_id,
+        }
+
+    def get_pack(self, pack_id=None):
+        """Full editable definition of one pack (or the active one if no
+        id given), for the Topic screen's form fields."""
+        pack = PackLoader.load(pack_id) if pack_id else PackLoader.get_active()
+        return pack.model_dump()
+
+    def set_active_pack(self, pack_id):
+        """Switches which pack is active. Takes effect immediately for
+        anything resolved per-call (prompt wording, synthesis config,
+        the output-folder safety check) -- but NOT for the shape of the
+        per-paper extraction schema itself (PerformanceMetrics/Relevance
+        field names), which is fixed for this already-running process.
+        The frontend should tell the user a restart is needed before
+        running the main per-paper pipeline under a newly-selected pack;
+        see src/packs/loader.py's docstring for why that's a deliberate
+        simplification rather than a bug."""
+        PackLoader.set_active(pack_id)
+        return {"ok": True, "active_id": pack_id}
+
+    def save_pack(self, pack_dict):
+        """Creates a new pack, or overwrites an existing one with the
+        same id -- called from the Topic screen's "Save" button. Metrics
+        and relevance_targets arrive as comma/newline-separated strings
+        from plain text inputs (no add/remove-row widget yet -- see the
+        note in gui/index.html) and get split here.
+
+        Deliberately validated through the real Pack model (raises with
+        a clear pydantic error if something's missing/malformed) rather
+        than writing whatever JSON the form produced straight to disk."""
+
+        def _split(value):
+            if isinstance(value, list):
+                return [v.strip() for v in value if v.strip()]
+            return [v.strip() for v in str(value or "").replace("\n", ",").split(",") if v.strip()]
+
+        pack = Pack(
+            id=pack_dict["id"].strip(),
+            name=pack_dict.get("name", "").strip() or pack_dict["id"].strip(),
+            application=pack_dict.get("application", "").strip(),
+            metrics=_split(pack_dict.get("metrics")),
+            relevance_targets=_split(pack_dict.get("relevance_targets")),
+            compliance=ComplianceRule(
+                mode=pack_dict.get("compliance", {}).get("mode", "note"),
+                prompt_text=pack_dict.get("compliance", {}).get("prompt_text", ""),
+            ),
+            envelope=pack_dict.get("envelope", "").strip(),
+            requirements_dir=pack_dict.get("requirements_dir", "").strip() or f"docs/requirements-{pack_dict['id'].strip()}",
+            output_dir=pack_dict.get("output_dir", "").strip() or f"outputs_{pack_dict['id'].strip()}",
+        )
+
+        pack_dir = Path("packs") / pack.id
+        pack_dir.mkdir(parents=True, exist_ok=True)
+        (pack_dir / "pack.json").write_text(
+            json.dumps(pack.model_dump(), indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        return {"ok": True, "id": pack.id}
 
     def get_models(self):
         return PREFERRED_MODELS
@@ -242,7 +315,7 @@ class PipelineAPI:
 
             unverified = sum(1 for r in report.ranked_materials if not r.citation_verified)
 
-            md_path = synthesizer.kb_dir / f"seat_recliner_synthesis_{model_key}.md"
+            md_path = synthesizer.kb_dir / f"{synthesizer.pack.id}_synthesis_{model_key}.md"
 
             self._push("synthesis_done", {
                 "model_key": model_key,
@@ -409,6 +482,30 @@ class PipelineAPI:
         if total == 0:
 
             self._push("done", {"message": "Nothing to do -- all papers already processed."})
+
+            self._running = False
+
+            return
+
+
+
+        # Fail fast, once, with a clear message -- rather than letting the
+
+        # same pack-mismatch error repeat once per paper in the console.
+
+        # (Pipeline.run() checks this too; this is just a faster/quieter
+
+        # way to surface the same thing before starting a whole batch.)
+
+        try:
+
+            active_pack = PackLoader.get_active()
+
+            check_output_folder(output_dir, active_pack)
+
+        except Exception as e:
+
+            self._push("error", {"message": str(e)})
 
             self._running = False
 

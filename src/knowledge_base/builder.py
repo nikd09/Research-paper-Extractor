@@ -7,6 +7,9 @@ already extracted.
 import json
 from pathlib import Path
 
+from src.packs.loader import PackLoader
+from src.packs.output_guard import check_output_folder
+
 NEGATIVE_MARKERS = {
     "", "n/a", "na", "none", "not applicable", "not related",
     "no relevance", "not relevant", "unclear",
@@ -21,8 +24,23 @@ FILLER_KEYWORDS = [
 class KnowledgeBaseBuilder:
 
     def __init__(self, output_dir: str = "outputs", kb_dir: str = "knowledge_base"):
+        self.pack = PackLoader.get_active()
+        # Phase 4 safety net -- same reasoning as Synthesizer's check.
+        check_output_folder(output_dir, self.pack)
         self.json_dir = Path(output_dir) / "json"
         self.kb_dir = Path(kb_dir)
+        # Which relevance field counts as "is this paper relevant at
+        # all" -- the pack's first relevance target (e.g.
+        # seat_recliner_relevance, or corrosion_relevance for a
+        # different pack). Was hardcoded to "seat_recliner_relevance".
+        self.primary_relevance_key = (
+            self.pack.relevance_targets[0] if self.pack.relevance_targets else ""
+        )
+        # Which performance metrics get a one-line summary in the pack's
+        # topic file -- first three of the pack's metric list, same count
+        # as the three (friction_coefficients, loads, temperatures) that
+        # used to be hardcoded here.
+        self.summary_metric_keys = self.pack.metrics[:3]
 
     @staticmethod
     def _relevance_note(rel_obj) -> str:
@@ -92,7 +110,9 @@ class KnowledgeBaseBuilder:
         return str(entry)
 
     def _is_relevant(self, data: dict) -> bool:
-        text = self._relevance_note(data.get("relevance", {}).get("seat_recliner_relevance"))
+        if not self.primary_relevance_key:
+            return True  # a pack with no relevance targets treats every paper as relevant
+        text = self._relevance_note(data.get("relevance", {}).get(self.primary_relevance_key))
         return text.lower() not in NEGATIVE_MARKERS
 
     def _title(self, data: dict, fallback: str) -> str:
@@ -136,7 +156,7 @@ class KnowledgeBaseBuilder:
             for key in ("materials", "coatings", "lubricants"):
                 items += [f"**{key.capitalize()}:** {self._material_label(v)}" for v in m.get(key, [])]
             entries.append((self._title(d, stem), items))
-        self._write_section(entries, self.kb_dir / "materials.md", "Materials — Seat Recliner Relevant")
+        self._write_section(entries, self.kb_dir / "materials.md", f"Materials — {self.pack.name} Relevant")
 
         # wear_mechanisms.md
         entries = []
@@ -173,27 +193,29 @@ class KnowledgeBaseBuilder:
             note="Keyword-filtered from extracted materials/coatings -- not a separate AI judgment.",
         )
 
-        # seat_recliner.md
-        lines = ["# Seat Recliner Relevance — Extracted Findings", ""]
+        # <pack>.md -- was hardcoded "seat_recliner.md" with hardcoded
+        # relevance/metric field names; now driven by the active pack.
+        lines = [f"# {self.pack.name} Relevance — Extracted Findings", ""]
         for stem, d in papers:
             rel = d.get("relevance", {})
             perf = d.get("performance", {})
             lines.append(f"## {self._title(d, stem)}")
-            lines.append(f"- **Seat recliner relevance:** {self._relevance_note(rel.get('seat_recliner_relevance'))}")
-            auto_note = self._relevance_note(rel.get("automotive_relevance"))
-            if auto_note and auto_note.lower() not in NEGATIVE_MARKERS:
-                lines.append(f"- **Automotive relevance:** {auto_note}")
-            for key in ("friction_coefficients", "loads", "temperatures"):
+            for rel_key in self.pack.relevance_targets:
+                note = self._relevance_note(rel.get(rel_key))
+                if rel_key == self.primary_relevance_key or (note and note.lower() not in NEGATIVE_MARKERS):
+                    label = rel_key.replace("_", " ").replace(" relevance", "").title() + " relevance"
+                    lines.append(f"- **{label}:** {note}")
+            for key in self.summary_metric_keys:
                 if perf.get(key):
                     values_str = "; ".join(self._metric_to_str(mv) for mv in perf[key])
                     lines.append(f"- **{key.replace('_', ' ').title()}:** {values_str}")
             lines.append("")
         if not papers:
             lines.append("_No relevant papers processed yet._")
-        (self.kb_dir / "seat_recliner.md").write_text("\n".join(lines), encoding="utf-8")
+        (self.kb_dir / f"{self.pack.id}.md").write_text("\n".join(lines), encoding="utf-8")
 
         # global_summary.md
-        lines = ["# Global Summary — Seat Recliner Knowledge Base", "",
+        lines = [f"# Global Summary — {self.pack.name} Knowledge Base", "",
                   f"Relevant papers: {len(papers)} / {len(all_json)} processed", ""]
         for stem, d in papers:
             year = d.get("metadata", {}).get("year", "")

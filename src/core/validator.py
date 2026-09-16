@@ -209,14 +209,13 @@ class NumericValidator:
         if perf is None:
             return 0
 
-        fields = [
-            "friction_coefficients",
-            "wear_rates",
-            "mechanical_properties",
-            "loads",
-            "temperatures",
-            "sliding_speeds",
-        ]
+        # Which fields exist on `performance` is pack-controlled (see
+        # src/packs/) -- read the active pack's list instead of a fixed
+        # six-name list, so a differently-focused pack (e.g. corrosion
+        # metrics instead of friction/wear) gets validated the same way
+        # without this file needing an edit.
+        from src.packs.loader import PackLoader
+        fields = PackLoader.get_active().metrics
 
         flagged_total = 0
 

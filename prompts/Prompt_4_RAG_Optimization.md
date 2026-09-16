@@ -142,8 +142,7 @@ paper.
 
 3c.
 
-Every `RelevanceNote` field (`relevance.automotive_relevance`,
-`relevance.seat_recliner_relevance`) is a structured record with
+Every `RelevanceNote` field ({{PACK_RELEVANCE_INLINE}}) is a structured record with
 `stated_in_paper` (boolean) and `note` (string). When you write this into
 prose (Markdown OR chunk content -- see rule 3a, same requirement applies
 identically to both outputs here too), you MUST:

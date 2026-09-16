@@ -2,9 +2,9 @@
 Cross-paper synthesis -- runs ONCE (on demand, not per-paper) over
 everything already sitting in outputs/json/, using whichever model is
 selected via --model (see synthesize.py). Produces a ranked, cited design
-brief for the seat recliner application, plus a deterministic grounding
-check (SynthesisValidator) since this stage has no crosscheck/escalation
-safety net of its own.
+brief for the active pack's target application (see src/packs/), plus a
+deterministic grounding check (SynthesisValidator) since this stage has
+no crosscheck/escalation safety net of its own.
 """
 
 import json
@@ -18,22 +18,24 @@ from src.ai.ai_extractor import AIExtractor
 from src.core.pdf_reader import PDFReader
 from src.core.synthesis_validator import SynthesisValidator
 from src.providers.gemini_client import GeminiClient
+from src.packs.loader import PackLoader
+from src.packs.output_guard import check_output_folder
 from src.utils import config as cfg
 from src.utils.logger import Logger
 
 # Confirmed real-world bug: the synthesis stage used to only ever see the
 # processed literature papers -- the actual project spec/market-case
 # documents were never given to it, so the operating envelope had to be
-# hand-typed as a paraphrase (DEFAULT_ENVELOPE in synthesize.py), and that
-# paraphrase turned out to be wrong on several material points (grease
-# lubrication, real temperature range, PFAS-free constraint, real load/
-# pressure magnitudes) simply because nobody re-read the source PDFs
-# before typing it. Drop the actual requirements documents (spec sheets,
-# market case decks, RFQs, etc. -- anything that ISN'T tribology
-# literature to be run through the full per-paper extraction schema) in
-# this folder, and they'll be read directly and treated as the
-# authoritative requirements source, ahead of any --envelope text.
-REQUIREMENTS_DIR = Path("docs/requirements")
+# hand-typed as a paraphrase, and that paraphrase turned out to be wrong
+# on several material points (grease lubrication, real temperature range,
+# PFAS-free constraint, real load/pressure magnitudes) simply because
+# nobody re-read the source PDFs before typing it. Drop the actual
+# requirements documents (spec sheets, market case decks, RFQs, etc. --
+# anything that ISN'T tribology literature to be run through the full
+# per-paper extraction schema) in the active pack's requirements folder
+# (packs/<id>/pack.json's `requirements_dir` -- was a hardcoded constant
+# here, now pack-scoped so two research focuses don't share one folder of
+# requirement PDFs by accident).
 
 
 class Synthesizer:
@@ -47,8 +49,15 @@ class Synthesizer:
 
         self.model_key = model_key
         self.model_name = cfg.SYNTHESIS_MODEL_OPTIONS[model_key]
+        self.pack = PackLoader.get_active()
+        # Phase 4 safety net -- same check pipeline.py does before writing:
+        # refuse to synthesize over a folder stamped by a different pack,
+        # since that would silently blend two research focuses' data into
+        # one design brief. See src/packs/output_guard.py.
+        check_output_folder(output_dir, self.pack)
         self.json_dir = Path(output_dir) / "json"
         self.kb_dir = Path(kb_dir)
+        self.requirements_dir = Path(self.pack.requirements_dir)
 
         # Same unified free-tier key cascade as every other stage now --
         # "pro" behaves like verify_escalate (high thinking budget for
@@ -82,16 +91,16 @@ class Synthesizer:
         return papers
 
     def _load_requirements_docs(self) -> str:
-        """Reads every PDF in docs/requirements/ as plain text -- these are
-        the actual project spec/market-case documents, not tribology
-        literature, so they don't go through the per-paper extraction
-        schema. Returns "" if the folder doesn't exist or is empty, so
-        callers degrade gracefully to --envelope text only rather than
-        crashing."""
-        if not REQUIREMENTS_DIR.exists():
+        """Reads every PDF in the active pack's requirements folder as
+        plain text -- these are the actual project spec/market-case
+        documents, not literature, so they don't go through the per-paper
+        extraction schema. Returns "" if the folder doesn't exist or is
+        empty, so callers degrade gracefully to --envelope text only
+        rather than crashing."""
+        if not self.requirements_dir.exists():
             return ""
 
-        pdfs = sorted(REQUIREMENTS_DIR.glob("*.pdf"))
+        pdfs = sorted(self.requirements_dir.glob("*.pdf"))
         if not pdfs:
             return ""
 
@@ -121,14 +130,14 @@ class Synthesizer:
         requirements_text = self._load_requirements_docs()
         if requirements_text:
             Logger.info(
-                f"[synthesizer] Using {len(list(REQUIREMENTS_DIR.glob('*.pdf')))} "
+                f"[synthesizer] Using {len(list(self.requirements_dir.glob('*.pdf')))} "
                 f"requirements document(s) as the authoritative source -- "
                 f"--envelope text is supplementary framing only."
             )
         else:
             Logger.warning(
                 f"[synthesizer] No requirements documents found in "
-                f"{REQUIREMENTS_DIR}/ -- falling back to the --envelope text "
+                f"{self.requirements_dir}/ -- falling back to the --envelope text "
                 f"alone. Add your actual spec/market-case PDFs there for a "
                 f"properly grounded design brief instead of a hand-typed "
                 f"paraphrase."
@@ -180,13 +189,13 @@ PAPERS PROVIDED ({len(source_papers)} total):
     def _save(self, report: SynthesisReport):
         self.kb_dir.mkdir(parents=True, exist_ok=True)
 
-        json_path = self.kb_dir / f"seat_recliner_synthesis_{self.model_key}.json"
+        json_path = self.kb_dir / f"{self.pack.id}_synthesis_{self.model_key}.json"
         json_path.write_text(
             json.dumps(report.model_dump(), indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
 
-        md_path = self.kb_dir / f"seat_recliner_synthesis_{self.model_key}.md"
+        md_path = self.kb_dir / f"{self.pack.id}_synthesis_{self.model_key}.md"
         md_path.write_text(self._to_markdown(report), encoding="utf-8")
 
         Logger.success(f"[synthesizer] Saved -> {json_path}")
@@ -194,7 +203,7 @@ PAPERS PROVIDED ({len(source_papers)} total):
 
     def _to_markdown(self, report: SynthesisReport) -> str:
         lines = [
-            f"# Seat Recliner Material Synthesis ({report.model_used})",
+            f"# {self.pack.name} -- Material Synthesis ({report.model_used})",
             "",
             "**AI-synthesized recommendation -- verify against source data "
             "before relying on it. `citation_verified: false` on any item "
