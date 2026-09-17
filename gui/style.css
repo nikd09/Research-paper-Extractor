@@ -300,6 +300,25 @@ select {
 .pack-note.warn { color: #c97a3a; }
 .pack-note.ok { color: var(--accent); }
 
+.pack-req-dir {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+  margin-bottom: 6px;
+}
+
+.pack-req-list {
+  font-size: 11.5px;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+.pack-req-list .req-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* ---------------- Stats ---------------- */
 
 .stats {

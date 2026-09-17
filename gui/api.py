@@ -199,7 +199,76 @@ class PipelineAPI:
         (pack_dir / "pack.json").write_text(
             json.dumps(pack.model_dump(), indent=2, ensure_ascii=False), encoding="utf-8"
         )
+        # Create the requirements folder immediately, even empty -- so
+        # there's always a real, existing place to drop reference PDFs
+        # into (by hand or via add_requirement_files below) without
+        # anyone needing to know or create the path themselves first.
+        Path(pack.requirements_dir).mkdir(parents=True, exist_ok=True)
         return {"ok": True, "id": pack.id}
+
+    def delete_pack(self, pack_id):
+        """Removes a topic entirely -- its pack.json and its requirements
+        folder. Refuses to delete the currently active topic (switch to a
+        different one first) and refuses to delete the last remaining
+        topic (there always has to be an active one)."""
+        import shutil
+
+        available = PackLoader.list_available()
+        if len(available) <= 1:
+            return {"error": "Can't delete the only topic that exists -- create another one first."}
+
+        if pack_id == PackLoader.get_active_id():
+            return {"error": "This topic is currently active. Switch to a different topic first, then delete this one."}
+
+        pack_dir = Path("packs") / pack_id
+        if not pack_dir.exists():
+            return {"error": f"No topic named '{pack_id}' found."}
+
+        shutil.rmtree(pack_dir)
+        return {"ok": True}
+
+    def list_requirement_files(self, pack_id):
+        """PDF filenames currently sitting in this topic's requirements
+        folder -- for showing what's already there in the Topic panel."""
+        pack = PackLoader.load(pack_id)
+        req_dir = Path(pack.requirements_dir)
+        if not req_dir.exists():
+            return {"dir": pack.requirements_dir, "files": []}
+        return {
+            "dir": pack.requirements_dir,
+            "files": sorted(p.name for p in req_dir.glob("*.pdf")),
+        }
+
+    def pick_requirement_files(self):
+        """Same native multi-file picker as pick_papers, reused here so
+        adding reference documents doesn't need a second dialog
+        implementation."""
+        return self.pick_papers()
+
+    def upload_requirement_files(self, pack_id, file_paths):
+        """Copies picked PDFs into this topic's requirements folder --
+        same copy logic as upload_papers, targeting the pack's
+        requirements_dir instead of the pipeline's input folder."""
+        import shutil
+
+        pack = PackLoader.load(pack_id)
+        dest_dir = Path(pack.requirements_dir)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        copied, skipped = [], []
+        for src in file_paths:
+            src_path = Path(src)
+            if src_path.suffix.lower() != ".pdf":
+                skipped.append(src_path.name)
+                continue
+            dest = dest_dir / src_path.name
+            try:
+                shutil.copy2(src_path, dest)
+                copied.append(src_path.name)
+            except Exception:
+                skipped.append(src_path.name)
+
+        return {"copied": copied, "skipped": skipped, "dir": pack.requirements_dir}
 
     def get_models(self):
         return PREFERRED_MODELS
