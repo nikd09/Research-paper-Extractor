@@ -36,10 +36,21 @@ if _legacy_key and _legacy_key not in FREE_API_KEYS:
 # ==========================
 # Gemini Model Configuration
 # ==========================
+# HOW TO ADD/SWAP A MODEL WHEN GOOGLE SHIPS A NEW ONE:
+# Every stage below is built from the four named tiers just under this
+# comment -- edit a tier here and every stage using it picks up the change
+# automatically, instead of hunting down each literal model string
+# separately. Only touch the per-stage lists further down if you want to
+# add an extra fallback model to ONE specific stage rather than retire an
+# old tier everywhere.
+_FLASH_LATEST = "models/gemini-3.6-flash"           # current best free-tier Flash
+_FLASH_PREVIOUS = "models/gemini-3.5-flash"         # one generation back -- fallback
+_FLASH_LITE = "models/gemini-3.5-flash-lite"        # cheapest/fastest -- crosscheck only
+_FLASH_DEEP_REASONING = "models/gemini-3.7-flash"   # high thinking-budget tier -- escalation + synthesis "pro"
 
 EXTRACT_MODELS = [
-    "models/gemini-3.6-flash",
-    "models/gemini-3.5-flash",
+    _FLASH_LATEST,
+    _FLASH_PREVIOUS,
 ]
 
 # Verify tries Flash 3.6 then 3.5, on whichever key the unified cascade
@@ -56,7 +67,7 @@ EXTRACT_MODELS = [
 MANUAL_PRO_VERIFY = False
 
 VERIFY_CASCADE = [
-    {"models": ["models/gemini-3.6-flash", "models/gemini-3.5-flash"]},
+    {"models": [_FLASH_LATEST, _FLASH_PREVIOUS]},
 ]
 
 # Last-resort escalation ONLY -- called for the specific claims still
@@ -67,19 +78,19 @@ VERIFY_CASCADE = [
 # a Pro-tier model -- this stage no longer deliberately reaches for a
 # paid model. Swap this one line any time to re-test with a different
 # model.
-ESCALATION_MODEL = "models/gemini-3.7-flash"
+ESCALATION_MODEL = _FLASH_DEEP_REASONING
 
 if MANUAL_PRO_VERIFY:
     VERIFY_CASCADE.append({"models": [ESCALATION_MODEL]})
 
 RAG_MODELS = [
-    "models/gemini-3.6-flash",
-    "models/gemini-3.5-flash",
+    _FLASH_LATEST,
+    _FLASH_PREVIOUS,
 ]
 
 CROSSCHECK_MODELS = [
-    "models/gemini-3.5-flash-lite",
-    "models/gemini-3.6-flash",
+    _FLASH_LITE,
+    _FLASH_LATEST,
 ]
 
 # ==========================
@@ -98,8 +109,8 @@ CROSSCHECK_MODELS = [
 # Flash-tier now -- "pro" gets a high thinking budget (see
 # Synthesizer.__init__) for deeper reasoning instead of a stronger model.
 SYNTHESIS_MODEL_OPTIONS = {
-    "flash": "models/gemini-3.6-flash",
-    "pro": "models/gemini-3.7-flash",
+    "flash": _FLASH_LATEST,
+    "pro": _FLASH_DEEP_REASONING,
 }
 
 STAGE_CONFIG = {
@@ -130,6 +141,18 @@ REQUEST_TIMEOUT = 120
 # wastes daily quota fast instead of giving the underlying condition a
 # chance to clear.
 RETRY_BACKOFF_BASE_SECONDS = 2
+
+# A sustained "high demand" (503) wave routinely outlasts one full pass
+# through every model/key/attempt combo (observed: ~5 minutes on a real
+# run). Cycling keys doesn't help there -- rate limits and model capacity
+# are per Google Cloud project/model, not per key, so hammering a second
+# or third key during a shared capacity outage mostly wastes attempts
+# (each still counts against daily RPD). Instead: after one full pass
+# fails end-to-end, pause for SPIKE_COOLDOWN_SECONDS once -- long enough
+# to plausibly let a real spike clear -- then run the whole pass again, up
+# to MAX_FULL_CYCLES times total, before finally giving up on that call.
+SPIKE_COOLDOWN_SECONDS = 30
+MAX_FULL_CYCLES = 2
 
 # Enable/disable optional fixes without touching pipeline code
 ENABLE_NUMERIC_VALIDATION = True   # Fix #1
