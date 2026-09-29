@@ -37,37 +37,44 @@ if _legacy_key and _legacy_key not in FREE_API_KEYS:
 # Gemini Model Configuration
 # ==========================
 # HOW TO ADD/SWAP A MODEL WHEN GOOGLE SHIPS A NEW ONE:
-# Every stage below is built from the four named tiers just under this
-# comment -- edit a tier here and every stage using it picks up the change
-# automatically, instead of hunting down each literal model string
-# separately. Only touch the per-stage lists further down if you want to
-# add an extra fallback model to ONE specific stage rather than retire an
-# old tier everywhere.
-_FLASH_LATEST = "models/gemini-3.6-flash"           # current best free-tier Flash
-_FLASH_PREVIOUS = "models/gemini-3.5-flash"         # one generation back -- fallback
-_FLASH_LITE = "models/gemini-3.5-flash-lite"        # cheapest/fastest -- crosscheck only
-_FLASH_DEEP_REASONING = "models/gemini-3.7-flash"   # high thinking-budget tier -- escalation + synthesis "pro"
+# Give it its own _FLASH_X_Y constant named after its real version number,
+# not a relative label like "latest"/"previous" -- a relative name goes
+# stale silently the instant a newer model ships (that's exactly what
+# happened here: gemini-3.8-flash shipped and "_FLASH_LATEST" was still
+# pointing at 3.6). Then just drop the new constant into whichever
+# per-stage list(s) below you want it tried in, in whatever order.
+_FLASH_3_8 = "models/gemini-3.8-flash"         # newest (Sept 2026) -- most capable Flash yet
+_FLASH_3_7 = "models/gemini-3.7-flash"
+_FLASH_3_6 = "models/gemini-3.6-flash"
+_FLASH_3_5_LITE = "models/gemini-3.5-flash-lite"  # cheapest/fastest -- crosscheck only
 
+# Extract/verify/rag all try newest-first with two fallbacks behind it
+# (3.8 -> 3.7 -> 3.6) instead of just one -- with a tight daily free-tier
+# quota, an extra fallback tier means more chances to get through a given
+# paper before the whole key/model cascade is exhausted and the paper
+# fails outright, and a brand-new model is also less likely to be as
+# congested yet as one everyone's already hammering.
 EXTRACT_MODELS = [
-    _FLASH_LATEST,
-    _FLASH_PREVIOUS,
+    _FLASH_3_8,
+    _FLASH_3_7,
+    _FLASH_3_6,
 ]
 
-# Verify tries Flash 3.6 then 3.5, on whichever key the unified cascade
-# hands it (see KeyManager.sequence()). Escalation does NOT run here by
-# default -- it's reserved for the automatic escalation stage below (only
-# the specific values still flagged after everything else, near-zero
-# quota use on clean papers).
+# Verify tries the same 3-model cascade, on whichever key the unified
+# cascade hands it (see KeyManager.sequence()). Escalation does NOT run
+# here by default -- it's reserved for the automatic escalation stage
+# below (only the specific values still flagged after everything else,
+# near-zero quota use on clean papers).
 #
 # MANUAL_PRO_VERIFY: flip to True if you've looked at a paper's results
 # and Flash isn't cutting it -- this adds a full-paper high-thinking pass
-# (not just flagged residuals) after the two Flash steps. Flash is always
-# tried first regardless of this setting; this only controls whether the
-# escalation-tier model gets a full unconditional pass on top.
+# (not just flagged residuals) after the three Flash steps. Flash is
+# always tried first regardless of this setting; this only controls
+# whether the escalation-tier model gets a full unconditional pass on top.
 MANUAL_PRO_VERIFY = False
 
 VERIFY_CASCADE = [
-    {"models": [_FLASH_LATEST, _FLASH_PREVIOUS]},
+    {"models": [_FLASH_3_8, _FLASH_3_7, _FLASH_3_6]},
 ]
 
 # Last-resort escalation ONLY -- called for the specific claims still
@@ -78,19 +85,20 @@ VERIFY_CASCADE = [
 # a Pro-tier model -- this stage no longer deliberately reaches for a
 # paid model. Swap this one line any time to re-test with a different
 # model.
-ESCALATION_MODEL = _FLASH_DEEP_REASONING
+ESCALATION_MODEL = _FLASH_3_8
 
 if MANUAL_PRO_VERIFY:
     VERIFY_CASCADE.append({"models": [ESCALATION_MODEL]})
 
 RAG_MODELS = [
-    _FLASH_LATEST,
-    _FLASH_PREVIOUS,
+    _FLASH_3_8,
+    _FLASH_3_7,
+    _FLASH_3_6,
 ]
 
 CROSSCHECK_MODELS = [
-    _FLASH_LITE,
-    _FLASH_LATEST,
+    _FLASH_3_5_LITE,
+    _FLASH_3_6,
 ]
 
 # ==========================
@@ -109,8 +117,8 @@ CROSSCHECK_MODELS = [
 # Flash-tier now -- "pro" gets a high thinking budget (see
 # Synthesizer.__init__) for deeper reasoning instead of a stronger model.
 SYNTHESIS_MODEL_OPTIONS = {
-    "flash": _FLASH_LATEST,
-    "pro": _FLASH_DEEP_REASONING,
+    "flash": _FLASH_3_6,
+    "pro": _FLASH_3_8,
 }
 
 STAGE_CONFIG = {
