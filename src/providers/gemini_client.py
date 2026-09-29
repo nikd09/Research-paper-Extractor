@@ -15,6 +15,8 @@ from src.utils.config import (
     MAX_RETRIES,
     REQUEST_TIMEOUT,
     RETRY_BACKOFF_BASE_SECONDS,
+    SPIKE_COOLDOWN_SECONDS,
+    MAX_FULL_CYCLES,
 )
 from src.utils.logger import Logger
 
@@ -107,65 +109,77 @@ class GeminiClient(BaseProvider):
         thinking_level = cfg.get("thinking_level")
         thinking_budget = cfg.get("thinking_budget")
 
-        key_sequence = self.key_manager.sequence()
-
         expected_model = self.active_model if stage == "extract" else None
         last_error = None
 
-        for api_key in key_sequence:
-            client = self._client_for(api_key)
+        for cycle in range(MAX_FULL_CYCLES):
+            key_sequence = self.key_manager.sequence()
 
-            for model in models:
-                for attempt in range(MAX_RETRIES):
-                    try:
-                        Logger.info(f"[{stage}] Trying {model} (attempt {attempt + 1})")
+            for api_key in key_sequence:
+                client = self._client_for(api_key)
 
-                        response = self._generate(
-                            client, model, prompt, schema, file_path, images,
-                            thinking_level=thinking_level,
-                            thinking_budget=thinking_budget,
-                        )
+                for model in models:
+                    for attempt in range(MAX_RETRIES):
+                        try:
+                            Logger.info(f"[{stage}] Trying {model} (attempt {attempt + 1})")
 
-                        if stage == "extract":
-                            self.active_model = model
-                        self.model_call_log[stage] = model
-                        Logger.success(f"[{stage}] Used model: {model}")
+                            response = self._generate(
+                                client, model, prompt, schema, file_path, images,
+                                thinking_level=thinking_level,
+                                thinking_budget=thinking_budget,
+                            )
 
-                        if (
-                            stage == "extract"
-                            and expected_model
-                            and model != expected_model
-                            and self.on_fallback
-                        ):
-                            try:
-                                self.on_fallback(expected_model, model, "unavailable or over quota")
-                            except Exception:
-                                pass
+                            if stage == "extract":
+                                self.active_model = model
+                            self.model_call_log[stage] = model
+                            Logger.success(f"[{stage}] Used model: {model}")
 
-                        return response
+                            if (
+                                stage == "extract"
+                                and expected_model
+                                and model != expected_model
+                                and self.on_fallback
+                            ):
+                                try:
+                                    self.on_fallback(expected_model, model, "unavailable or over quota")
+                                except Exception:
+                                    pass
 
-                    except (ServerError, ClientError, httpx.HTTPError) as e:
-                        # httpx.HTTPError (ReadTimeout, ConnectTimeout,
-                        # ConnectError, etc.) is a raw transport-layer
-                        # failure, not a google.genai.errors.ServerError/
-                        # ClientError -- confirmed bug: without catching it
-                        # here too, a network timeout on attempt 1 escaped
-                        # this whole retry/model-cascade/key-rotation loop
-                        # entirely and crashed the pipeline run, even though
-                        # MAX_RETRIES and the next model/key were right
-                        # there unused. Treat it like any other transient
-                        # failure: retry, then fall through to the next
-                        # model/key.
-                        last_error = e
-                        if isinstance(e, (ServerError, ClientError)) and _is_rate_limit_error(e):
-                            self.key_manager.mark_exhausted(api_key)
-                            break  # stop retrying this model on this key, rotate key instead
-                        Logger.warning(f"[{stage}] {model} failed: {e}")
-                        if attempt < MAX_RETRIES - 1:
-                            delay = RETRY_BACKOFF_BASE_SECONDS * (2 ** attempt)
-                            Logger.info(f"[{stage}] Backing off {delay}s before retrying {model}...")
-                            time.sleep(delay)
-                        continue
+                            return response
+
+                        except (ServerError, ClientError, httpx.HTTPError) as e:
+                            # httpx.HTTPError (ReadTimeout, ConnectTimeout,
+                            # ConnectError, etc.) is a raw transport-layer
+                            # failure, not a google.genai.errors.ServerError/
+                            # ClientError -- confirmed bug: without catching it
+                            # here too, a network timeout on attempt 1 escaped
+                            # this whole retry/model-cascade/key-rotation loop
+                            # entirely and crashed the pipeline run, even though
+                            # MAX_RETRIES and the next model/key were right
+                            # there unused. Treat it like any other transient
+                            # failure: retry, then fall through to the next
+                            # model/key.
+                            last_error = e
+                            if isinstance(e, (ServerError, ClientError)) and _is_rate_limit_error(e):
+                                self.key_manager.mark_exhausted(api_key)
+                                break  # stop retrying this model on this key, rotate key instead
+                            Logger.warning(f"[{stage}] {model} failed: {e}")
+                            if attempt < MAX_RETRIES - 1:
+                                delay = RETRY_BACKOFF_BASE_SECONDS * (2 ** attempt)
+                                Logger.info(f"[{stage}] Backing off {delay}s before retrying {model}...")
+                                time.sleep(delay)
+                            continue
+
+            # Every model/key combo failed this pass -- likely a sustained
+            # provider-side capacity spike (503s), not something more
+            # attempts fix immediately. Give it real time to clear instead
+            # of re-hammering, then try the whole pass again.
+            if cycle < MAX_FULL_CYCLES - 1:
+                Logger.warning(
+                    f"[{stage}] Every model/key failed this pass -- cooling off "
+                    f"{SPIKE_COOLDOWN_SECONDS}s before a second full pass..."
+                )
+                time.sleep(SPIKE_COOLDOWN_SECONDS)
 
         raise RuntimeError(
             f"No Gemini model/key available for stage '{stage}'. Last error: {last_error}"
@@ -198,47 +212,66 @@ class GeminiClient(BaseProvider):
                 first_model = step["models"][0]
                 break
 
-        for step in cascade:
-            try:
-                key_seq = self.key_manager.sequence()
-            except RuntimeError as e:
-                last_error = e
+        for cycle in range(MAX_FULL_CYCLES):
+            keys_exhausted = False
+
+            for step in cascade:
+                try:
+                    key_seq = self.key_manager.sequence()
+                except RuntimeError as e:
+                    last_error = e
+                    keys_exhausted = True
+                    break
+
+                for model in step["models"]:
+                    for api_key in key_seq:
+                        client = self._client_for(api_key)
+                        for attempt in range(MAX_RETRIES):
+                            try:
+                                Logger.info(f"[{stage}] Trying {model} (attempt {attempt + 1})")
+                                response = self._generate(client, model, prompt, schema, file_path, images)
+                                self.model_call_log[stage] = model
+                                Logger.success(f"[{stage}] Used model: {model}")
+
+                                if warn_on_fallback and first_model and model != first_model:
+                                    Logger.warning(
+                                        f"[{stage}] Fell back from {first_model} to {model} -- "
+                                        "may be lower quality."
+                                    )
+
+                                return response
+
+                            except (ServerError, ClientError, httpx.HTTPError) as e:
+                                # See matching comment in generate() above --
+                                # httpx.HTTPError (timeouts, connection resets)
+                                # must be caught here too or it escapes the
+                                # cascade entirely instead of falling through
+                                # to the next model/step.
+                                last_error = e
+                                if isinstance(e, (ServerError, ClientError)) and _is_rate_limit_error(e):
+                                    self.key_manager.mark_exhausted(api_key)
+                                    break  # stop retrying this model on this key
+                                Logger.warning(f"[{stage}] {model} failed: {e}")
+                                if attempt < MAX_RETRIES - 1:
+                                    delay = RETRY_BACKOFF_BASE_SECONDS * (2 ** attempt)
+                                    Logger.info(f"[{stage}] Backing off {delay}s before retrying {model}...")
+                                    time.sleep(delay)
+                                continue
+
+            # Every model/key combo in the cascade failed this pass. If it
+            # was pure key exhaustion (429), a cooldown won't un-exhaust
+            # them (that's a daily reset, not a timer), so don't bother
+            # waiting -- just report it. Otherwise this is most likely a
+            # sustained provider-side capacity spike (503s); give it real
+            # time to clear before trying the whole cascade again.
+            if cycle < MAX_FULL_CYCLES - 1 and not keys_exhausted:
+                Logger.warning(
+                    f"[{stage}] Every model/key failed this pass -- cooling off "
+                    f"{SPIKE_COOLDOWN_SECONDS}s before a second full pass..."
+                )
+                time.sleep(SPIKE_COOLDOWN_SECONDS)
+            elif keys_exhausted:
                 break
-
-            for model in step["models"]:
-                for api_key in key_seq:
-                    client = self._client_for(api_key)
-                    for attempt in range(MAX_RETRIES):
-                        try:
-                            Logger.info(f"[{stage}] Trying {model} (attempt {attempt + 1})")
-                            response = self._generate(client, model, prompt, schema, file_path, images)
-                            self.model_call_log[stage] = model
-                            Logger.success(f"[{stage}] Used model: {model}")
-
-                            if warn_on_fallback and first_model and model != first_model:
-                                Logger.warning(
-                                    f"[{stage}] Fell back from {first_model} to {model} -- "
-                                    "may be lower quality."
-                                )
-
-                            return response
-
-                        except (ServerError, ClientError, httpx.HTTPError) as e:
-                            # See matching comment in generate() above --
-                            # httpx.HTTPError (timeouts, connection resets)
-                            # must be caught here too or it escapes the
-                            # cascade entirely instead of falling through
-                            # to the next model/step.
-                            last_error = e
-                            if isinstance(e, (ServerError, ClientError)) and _is_rate_limit_error(e):
-                                self.key_manager.mark_exhausted(api_key)
-                                break  # stop retrying this model on this key
-                            Logger.warning(f"[{stage}] {model} failed: {e}")
-                            if attempt < MAX_RETRIES - 1:
-                                delay = RETRY_BACKOFF_BASE_SECONDS * (2 ** attempt)
-                                Logger.info(f"[{stage}] Backing off {delay}s before retrying {model}...")
-                                time.sleep(delay)
-                            continue
 
         raise RuntimeError(
             f"No Gemini model/key available for stage '{stage}'. Last error: {last_error}"

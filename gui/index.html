@@ -128,10 +128,19 @@
             <label>Default operating envelope</label>
             <textarea id="packEnvelopeInput" rows="4"></textarea>
           </div>
+          <div class="field">
+            <label>Reference / requirements documents <span class="info-badge" title="Real spec or market-case PDFs for this topic. Read directly by the AI and treated as more authoritative than the envelope text above -- add them here instead of typing everything into the envelope box.">i</span></label>
+            <div class="pack-req-dir" id="packReqDir"></div>
+            <div class="pack-req-list" id="packReqList"></div>
+            <button class="btn btn-ghost btn-full" id="addReqFilesBtn">+ Add reference PDFs</button>
+          </div>
           <div class="actions">
             <button class="btn btn-ghost" id="newPackBtn">New Topic</button>
             <button class="btn btn-primary" id="savePackBtn">Save Topic</button>
             <button class="btn btn-ghost" id="activatePackBtn">Make Active</button>
+          </div>
+          <div class="actions">
+            <button class="btn btn-stop" id="deletePackBtn">Delete This Topic</button>
           </div>
           <div class="pack-note" id="packSaveNote"></div>
         </details>

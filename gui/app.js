@@ -42,7 +42,11 @@ const el = {
   newPackBtn: document.getElementById("newPackBtn"),
   savePackBtn: document.getElementById("savePackBtn"),
   activatePackBtn: document.getElementById("activatePackBtn"),
+  deletePackBtn: document.getElementById("deletePackBtn"),
   packSaveNote: document.getElementById("packSaveNote"),
+  packReqDir: document.getElementById("packReqDir"),
+  packReqList: document.getElementById("packReqList"),
+  addReqFilesBtn: document.getElementById("addReqFilesBtn"),
 };
 
 let lastMarkdownPath = null;
@@ -368,6 +372,16 @@ async function loadPackIntoForm(packId) {
 
   const short = pack.application.length > 140 ? pack.application.slice(0, 140) + "..." : pack.application;
   el.packApplicationNote.textContent = short;
+
+  await refreshRequirementFiles(packId);
+}
+
+async function refreshRequirementFiles(packId) {
+  const { dir, files } = await pywebview.api.list_requirement_files(packId);
+  el.packReqDir.textContent = dir;
+  el.packReqList.innerHTML = files.length
+    ? files.map((f) => `<div>${f}</div>`).join("")
+    : `<span class="req-empty">No reference documents added yet -- the AI will fall back to the envelope text above.</span>`;
 }
 
 el.packSelect.addEventListener("change", () => loadPackIntoForm(el.packSelect.value));
@@ -422,6 +436,38 @@ el.activatePackBtn.addEventListener("click", async () => {
     `"${packId}" is now active. The Knowledge Base step already uses it. ` +
     `Restart the app before running the main pipeline so it fully switches over too.`;
   await refreshPackList(packId);
+});
+
+el.addReqFilesBtn.addEventListener("click", async () => {
+  const packId = el.packIdInput.value.trim() || el.packSelect.value;
+  if (!packId) return;
+  const paths = await pywebview.api.pick_requirement_files();
+  if (!paths || paths.length === 0) return;
+  const result = await pywebview.api.upload_requirement_files(packId, paths);
+  await refreshRequirementFiles(packId);
+  el.packSaveNote.className = "pack-note ok";
+  el.packSaveNote.textContent = result.copied.length
+    ? `Added: ${result.copied.join(", ")}`
+    : `Nothing added -- check the file(s) were actually PDFs.`;
+});
+
+el.deletePackBtn.addEventListener("click", async () => {
+  const packId = el.packIdInput.value.trim() || el.packSelect.value;
+  if (!packId) return;
+  const confirmed = confirm(
+    `Delete the topic "${packId}"? This removes its saved settings and its reference ` +
+    `documents folder. Papers you've already processed under it are NOT affected.`
+  );
+  if (!confirmed) return;
+  const result = await pywebview.api.delete_pack(packId);
+  if (result.error) {
+    el.packSaveNote.className = "pack-note warn";
+    el.packSaveNote.textContent = result.error;
+    return;
+  }
+  el.packSaveNote.className = "pack-note ok";
+  el.packSaveNote.textContent = `Deleted "${packId}".`;
+  await refreshPackList();
 });
 
 el.startBtn.addEventListener("click", async () => {
