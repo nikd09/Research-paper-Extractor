@@ -117,7 +117,7 @@ CROSSCHECK_MODELS = [
 # Flash-tier now -- "pro" gets a high thinking budget (see
 # Synthesizer.__init__) for deeper reasoning instead of a stronger model.
 SYNTHESIS_MODEL_OPTIONS = {
-    "flash": _FLASH_3_6,
+    "flash": _FLASH_3_7,
     "pro": _FLASH_3_8,
 }
 
