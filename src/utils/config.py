@@ -138,29 +138,25 @@ STAGE_CONFIG = {
 # Kept for anything still importing the old flat list (e.g. tests).
 PREFERRED_MODELS = EXTRACT_MODELS
 
-MAX_RETRIES = 3
+# Retries on the SAME model, for ordinary transient errors only (e.g. a
+# dropped connection). Overload errors (503/504/read timeout) are never
+# retried on the same model -- see GeminiClient._try_model.
+MAX_RETRIES = 2
 REQUEST_TIMEOUT = 120
 
-# Base delay (seconds) between same-model retry attempts, doubled each
-# attempt (2s, 4s, 8s, ...). Without this, a sustained failure (a model
-# genuinely at capacity, not a one-off blip) burns through every
-# attempt/model/key combination back-to-back in seconds -- each one still
-# counts against RPD even though it failed, so a no-backoff retry storm
-# wastes daily quota fast instead of giving the underlying condition a
-# chance to clear.
+# Delay (seconds) before a same-model retry, doubled each attempt.
 RETRY_BACKOFF_BASE_SECONDS = 2
 
-# A sustained "high demand" (503) wave routinely outlasts one full pass
-# through every model/key/attempt combo (observed: ~5 minutes on a real
-# run). Cycling keys doesn't help there -- rate limits and model capacity
-# are per Google Cloud project/model, not per key, so hammering a second
-# or third key during a shared capacity outage mostly wastes attempts
-# (each still counts against daily RPD). Instead: after one full pass
-# fails end-to-end, pause for SPIKE_COOLDOWN_SECONDS once -- long enough
-# to plausibly let a real spike clear -- then run the whole pass again, up
-# to MAX_FULL_CYCLES times total, before finally giving up on that call.
-SPIKE_COOLDOWN_SECONDS = 30
-MAX_FULL_CYCLES = 2
+# Sustained "high demand" (503) waves can run several minutes (observed on
+# real runs). Hammering the same overloaded models can't help -- and every
+# failed call still counts against the daily free-tier quota -- so on a
+# capacity error the client moves to the next model immediately, never
+# rotates keys (overload is model-wide, not per-key), and after one full
+# pass over every model fails it pauses SPIKE_COOLDOWN_SECONDS before
+# trying again, up to MAX_FULL_CYCLES passes total. Worst case per call is
+# (number of models x MAX_FULL_CYCLES) requests, e.g. 3 x 3 = 9.
+SPIKE_COOLDOWN_SECONDS = 60
+MAX_FULL_CYCLES = 3
 
 # Enable/disable optional fixes without touching pipeline code
 ENABLE_NUMERIC_VALIDATION = True   # Fix #1
